@@ -421,23 +421,35 @@ pub(crate) fn recovered(path: &str) -> Result<DocState> {
     Ok(DocState::new(loaded.doc, None).with_versions(loaded.versions).with_branches(loaded.branches).unsaved())
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn read(path: &str) -> Result<Vec<u8>> {
-    std::fs::read(path).map_err(|e| EngineError::Other(format!("{path}: {e}")))
-}
+/// The largest file opened or imported as a document (the largest `.fig` file export writes).
+const MAX_DOCUMENT_FILE: u64 = 2 * 1024 * 1024 * 1024;
 
-#[cfg(target_arch = "wasm32")]
+/// The bytes of the document file `path`.
 fn read(path: &str) -> Result<Vec<u8>> {
-    Err(EngineError::Other(format!("{path}: no file system in the browser")))
+    read_capped(path, MAX_DOCUMENT_FILE)
 }
 
 /// The bytes of file `path`, refused when it's larger than `max`.
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn read_capped(path: &str, max: u64) -> Result<Vec<u8>> {
-    let meta = std::fs::metadata(path).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+    use std::io::Read as _;
+    let f = std::fs::File::open(path).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+    let meta = f.metadata().map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     if !meta.is_file() || meta.len() > max {
         return Err(EngineError::Other(format!("{path}: not a file of at most {max} bytes")));
     }
-    read(path)
+    let mut bytes = Vec::with_capacity(usize::try_from(meta.len()).unwrap_or(0));
+    // A file that grows after the size check still stops at `max`.
+    f.take(max.saturating_add(1)).read_to_end(&mut bytes).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+    if bytes.len() as u64 > max {
+        return Err(EngineError::Other(format!("{path}: not a file of at most {max} bytes")));
+    }
+    Ok(bytes)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn read_capped(path: &str, _max: u64) -> Result<Vec<u8>> {
+    Err(EngineError::Other(format!("{path}: no file system in the browser")))
 }
 
 /// Write `bytes` to `path` through a uniquely named, exclusively created staging file and one
@@ -566,7 +578,6 @@ fn rest_images(_path: &str) -> impl Fn(&str) -> Option<Vec<u8>> {
 }
 
 /// Largest variables JSON read from disk.
-#[cfg(not(target_arch = "wasm32"))]
 const MAX_VARIABLES_FILE: u64 = 256 * 1024 * 1024;
 
 /// A local variables JSON next to a REST API file JSON: `<name>.variables.json`, else
@@ -600,7 +611,7 @@ pub(crate) fn variables_param(cmd: &str, p: &Value) -> Result<Option<Value>> {
         None | Some(Value::Null) => return Ok(None),
         Some(v @ Value::Object(_)) => v.clone(),
         Some(Value::String(s)) if s.trim_start().starts_with('{') => parse(s.as_bytes())?,
-        Some(Value::String(path)) => parse(&read(path)?)?,
+        Some(Value::String(path)) => parse(&read_capped(path, MAX_VARIABLES_FILE)?)?,
         Some(_) => return Err(bad(cmd, "variables: the local variables JSON (an object, JSON text or a path)")),
     };
     if !figcraft_format::rest::is_variables_json(&v) {

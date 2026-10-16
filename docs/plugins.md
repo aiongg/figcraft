@@ -237,7 +237,14 @@ Whatever its manifest says, FigCraft refuses these calls (the plugin gets the re
 it can handle):
 
 - files and the app: `file.*`, `app.*`, `pref.*`, `help.*`, `library.add`, `libraries.*`,
-  `image.place` with a `path` (pass the image as base64 `data` instead), `view.theme*`;
+  `view.theme*`;
+- any call with a file parameter (`path`, `paths`, `dir`, `folder` or `file`, or `variables` given
+  as a path rather than JSON), such as `variable.export` with a `path` or `image.place` with a `path`
+  (pass the image as base64 `data` instead). The exceptions are parameters of those names that
+  aren't files: SVG path data in `node.create` and `vector.create`, the path layer in
+  `text.onPath`, action indexes in `proto.action.*` and `proto.conditional.*`, the style folder in
+  `style.move` and `style.renameFolder`, the direction in `comment.next` and the online file in
+  `collab.openFile`, `collab.forgetFile` and `collab.manageFile`;
 - other documents and the version history: `doc.*` and `version.*` (except `doc.list` and
   `version.list`);
 - the undo history and nesting: `edit.undo`, `edit.redo`, `edit.repeat`, `command.batch` (a run is

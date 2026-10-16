@@ -115,6 +115,37 @@ const DENIED: &[&str] = &[
 ];
 /// Read-only exceptions to [`DENIED`].
 const ALLOWED: &[&str] = &["doc.list", "version.list"];
+/// Parameters that name a file or folder. No plugin may pass one, except where
+/// [`NOT_FILE_PARAMS`] says that command's parameter of that name is something else.
+const FILE_PARAMS: &[&str] = &["path", "paths", "dir", "folder", "file"];
+/// Commands (an id, or a prefix ending in `.`) and their [`FILE_PARAMS`] that aren't files: SVG
+/// path data, a layer, action indexes, a style folder, a step direction, an online file's name.
+const NOT_FILE_PARAMS: &[(&str, &str)] = &[
+    ("node.create", "path"),
+    ("vector.create", "path"),
+    ("text.onPath", "path"),
+    ("proto.action.", "path"),
+    ("proto.conditional.", "path"),
+    ("style.move", "folder"),
+    ("style.renameFolder", "folder"),
+    ("comment.next", "dir"),
+    ("collab.openFile", "file"),
+    ("collab.forgetFile", "file"),
+    ("collab.manageFile", "file"),
+];
+
+/// The parameter of `params` that would make `command` read or write a file, if any.
+fn file_param(command: &str, params: &Value) -> Option<&'static str> {
+    let not_file = |key: &str| NOT_FILE_PARAMS.iter().any(|(c, k)| *k == key && (*c == command || (c.ends_with('.') && command.starts_with(c))));
+    if let Some(key) = FILE_PARAMS.iter().copied().find(|k| get(params, k).is_some() && !not_file(k)) {
+        return Some(key);
+    }
+    // `variables` is the variables JSON itself, or the path of a file holding it.
+    match get(params, "variables") {
+        Some(Value::String(v)) if !v.trim_start().starts_with('{') => Some("variables"),
+        _ => None,
+    }
+}
 
 /// Why a plugin may not call `command` with `params` (before running it), if it may not.
 fn refusal(m: &Manifest, command: &str, params: &Value) -> Option<String> {
@@ -127,6 +158,9 @@ fn refusal(m: &Manifest, command: &str, params: &Value) -> Option<String> {
     }
     if command == "image.place" && get(params, "path").is_some() {
         return Some("plugins can't read files: pass the image as `data`".into());
+    }
+    if let Some(key) = file_param(command, params) {
+        return Some(format!("plugins can't read or write files: `{command}` can't take a file `{key}`"));
     }
     if !m.permissions.allows(command) {
         return Some(format!("`{command}` isn't in the commands {} asked permission for", m.name));

@@ -192,6 +192,43 @@ fn files_dialogs_history_and_plugins_are_off_limits() {
 }
 
 #[test]
+fn no_plugin_passes_a_file_path_whatever_its_access() {
+    let mut s = Session::new();
+    let dir = std::env::temp_dir().join(format!("figcraft-plugin-paths-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let written = dir.join("written.json");
+    let secret = dir.join("secret.json");
+    std::fs::write(&secret, br#"{"meta": {"variableCollections": {}, "variables": {}}}"#).unwrap();
+    let refused = [
+        ("variable.export", json!({"path": written.to_string_lossy()})),
+        ("variable.import", json!({"variables": secret.to_string_lossy()})),
+        ("codeConnect.export", json!({"path": written.to_string_lossy()})),
+        ("component.playground", json!({"path": written.to_string_lossy()})),
+    ];
+    for access in ["read", "write"] {
+        for (cmd, params) in &refused {
+            install(&mut s, manifest("org.test.paths", access, &[]), &script(&[(cmd, params.clone())], OnRefusal::Report, ""));
+            let (doc, undo) = (s.ds().unwrap().doc.clone(), undo_len(&s));
+            let out = ex(&mut s, "plugin.run", json!({"id": "org.test.paths"}));
+            let msg = out["output"].as_str().unwrap_or_default();
+            assert!(msg.contains("can't read or write files"), "{access} {cmd}: {out}");
+            assert!(std::sync::Arc::ptr_eq(&doc, &s.ds().unwrap().doc), "{access} {cmd}");
+            assert_eq!(undo_len(&s), undo, "{access} {cmd}");
+        }
+    }
+    assert!(!written.exists(), "nothing was written");
+    // The same commands without a file, and parameters of those names that aren't files, still run.
+    let calls = [
+        ("variable.export", json!({})),
+        ("variable.import", json!({"variables": r#"{"meta": {"variableCollections": {}, "variables": {}}}"#})),
+        ("vector.create", json!({"path": "M0 0 L10 10"})),
+    ];
+    install(&mut s, manifest("org.test.paths", "write", &[]), &script(&calls, OnRefusal::Fail, ""));
+    ex(&mut s, "plugin.run", json!({"id": "org.test.paths"}));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn traps_endless_loops_and_memory_hogs_roll_back() {
     let mut s = Session::new();
     let a = rect(&mut s, 0.0);

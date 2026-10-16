@@ -1,7 +1,7 @@
 //! FigCraft desktop app.
 //!
-//! Usage: `figcraft [--control <port>] [files…] [figcraft://join?…]` (an invite link joins that
-//! live session; the app registers itself as the opener of such links: `collab.registerLinks`).
+//! Usage: `figcraft [--control <port>] [files…] [figcraft://join?…]` (an invite link opens the
+//! Join dialog for that live session; the app registers itself as the opener of such links: `collab.registerLinks`).
 //!
 //! `--control <port>` (or `FIGCRAFT_CONTROL_PORT`) starts a localhost JSON-lines control server:
 //! `{"id":1,"method":"engine.execute","params":{"command":"shape.rectangle","params":{"x":0,"y":0,"width":100,"height":100}}}`
@@ -177,7 +177,8 @@ fn main() -> eframe::Result {
     fig.ui.home = false;
     fig.note_recovered(recovered.copies);
     if let Some(link) = &args.join {
-        figcraft_ui_egui::live::open_invite(&mut fig, link);
+        let host = figcraft_collab_net::Invite::parse_join(link).map(|(invite, _)| invite.server.display());
+        figcraft_ui_egui::live::open_invite(&mut fig, link, host);
     }
     let queue: Arc<Mutex<Vec<ControlRequest>>> = Arc::new(Mutex::new(Vec::new()));
     if let Some(p) = port {

@@ -47,12 +47,18 @@ fn escape_closes_the_join_dialog_and_keeps_the_selection() {
 }
 
 #[test]
-fn opening_the_app_with_an_invite_link_joins() {
+fn opening_the_app_with_an_invite_link_asks_before_joining() {
     let (mut h, _) = Harness::new();
     let link = "figcraft://join?host=127.0.0.1:47900&file=abc&token=AbCdEfGhIjKlMnOpQrStUv";
-    crate::live::open_invite(&mut h.app, &format!(" {link} "));
-    assert_eq!(h.app.session.live().status, Status::Connecting);
-    assert!(h.app.ui.live.join.is_none(), "no dialog: it joins at once");
+    crate::live::open_invite(&mut h.app, &format!(" {link} "), Ok("127.0.0.1:47900".into()));
+    let shapes = h.frames(3);
+    assert_eq!(h.app.session.live().status, Status::Off, "nothing joined yet");
+    assert_eq!(h.app.ui.live.join.as_deref(), Some(link), "the Join dialog holds the link");
+    assert!(has_text(&shapes, "This invite joins a live session on 127.0.0.1:47900. Join only if you know who sent it."));
+    h.click(text_center(&shapes, "Join"));
+    h.frames(1);
+    assert_eq!(h.app.session.live().status, Status::Connecting, "joined once confirmed");
+    assert!(h.app.ui.live.join.is_none());
 }
 
 /// The browser's link: joins, can't host; joining fails here to show the dialog path.
@@ -80,7 +86,7 @@ impl LiveLink for Browser {
 fn a_link_that_cant_be_used_opens_the_dialog_with_it() {
     let (mut h, _) = Harness::new();
     h.app.session.live.install(Box::new(Browser));
-    crate::live::open_invite(&mut h.app, "figcraft://nope");
+    crate::live::open_invite(&mut h.app, "figcraft://nope", Err("that's not a live session invite".into()));
     assert_eq!(h.app.ui.live.join.as_deref(), Some("figcraft://nope"), "the link stays in the field to fix");
     assert!(h.app.ui.last_error.as_deref().is_some_and(|e| e.contains("not a live session invite")));
     assert_eq!(h.app.session.live().status, Status::Off);

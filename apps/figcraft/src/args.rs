@@ -1,7 +1,8 @@
 //! The command line: `figcraft [--control <port>] [files…] [figcraft://join?…]`. An invite link
-//! (what the system passes when a `figcraft://` link is opened) joins that session once the window
-//! is up; everything else that isn't a flag is a file to open, as a path or a `file://` URL (the
-//! Linux desktop entry passes URLs, `%U`, so that it can also hand over invite links).
+//! (what the system passes when a `figcraft://` link is opened) opens the Join dialog for that
+//! session once the window is up; everything else that isn't a flag is a file to open, as a path or
+//! a `file://` URL (the Linux desktop entry passes URLs, `%U`, so that it can also hand over invite
+//! links).
 
 /// What the app was started with.
 #[derive(Debug, Default, PartialEq, Eq)]

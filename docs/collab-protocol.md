@@ -8,7 +8,7 @@ embeds, invite links, document sync end to end (several apps edit one file), liv
 selections, avatars and follow. **Step 3 is implemented**: per-user undo and redo, rejection
 handling and offline queueing with reconnect (`crates/collab`, wired into the engine's live
 session and the transport). **Step 4 is implemented**: the browser build joins sessions a desktop
-app hosts, and `figcraft://` invite links open the app and join. Styles, variables, collections,
+app hosts, and `figcraft://` invite links open the app's Join dialog. Styles, variables, collections,
 modes and comments created in a session take ids from their creator's id space, and others' text
 carets, cursor chat and spotlights show live (see Presence). **Step 5 is implemented**: the
 standalone `figcraft-server` (`apps/figcraft-server`, running it: [`server.md`](server.md)) keeps
@@ -805,8 +805,9 @@ installing: [`plugins.md`](plugins.md#plugin-directories)):
 *Built* (opening invite links):
 
 - The desktop app takes an invite link on its command line (`figcraft "figcraft://join?…"`): once
-  the window is up it joins (`collab.join`); a link it can't use opens the Join dialog with the
-  link and the reason. Other arguments are files, as paths or `file://` URLs.
+  the window is up the Join dialog opens with the link and the server it names, and the app joins
+  (`collab.join`) only when Join or Enter confirms it; for a link it can't use, the dialog shows
+  the link and a toast the reason. Other arguments are files, as paths or `file://` URLs.
 - **Windows**: the app registers itself per user as the opener of `figcraft://` under
   `HKEY_CURRENT_USER\Software\Classes\figcraft` (no administrator rights): the scheme, its icon
   and `"<figcraft.exe>" "%1"`. Preferences ▸ **Open invite links in FigCraft** (and

@@ -90,6 +90,9 @@ pub struct LiveUi {
     pub join: Option<String>,
     /// Put the keyboard in the Join dialog's field on its next frame.
     focus_join: bool,
+    /// The invite link the app was opened with and the server it names, shown in the Join dialog
+    /// while its field holds that link.
+    invite: Option<(String, String)>,
     /// Share on the local network (else online, through the server in Preferences).
     pub local: bool,
     /// The Share popover's Advanced part shows; what it sets for a local network share: only
@@ -1047,11 +1050,19 @@ pub fn open_join(app: &mut FigApp, link: &str) {
     app.ui.live.focus_join = true;
 }
 
-/// An invite link the app was opened with (`figcraft figcraft://join?…`): join at once; a link
-/// that can't be used shows in the Join dialog with the reason.
-pub fn open_invite(app: &mut FigApp, link: &str) {
-    if app.run("collab.join", json!({"link": link.trim()})).is_none() {
-        open_join(app, link.trim());
+/// An invite link the app was opened with (`figcraft figcraft://join?…`): the Join dialog opens
+/// with it and the server it names (`host`, or why the link can't be used), and joins only when
+/// the Join button or Enter confirms it.
+pub fn open_invite(app: &mut FigApp, link: &str, host: Result<String, String>) {
+    let link = link.trim();
+    open_join(app, link);
+    app.ui.live.invite = None;
+    match host {
+        Ok(host) => app.ui.live.invite = Some((link.to_string(), host)),
+        Err(e) => {
+            app.toast(e.clone());
+            app.ui.last_error = Some(e);
+        }
     }
 }
 
@@ -1082,16 +1093,22 @@ pub fn join_dialog(app: &mut FigApp, ctx: &egui::Context) {
             go = join_field(app, ui, &mut link, egui::Id::new("live_join_link"), 300.0, focus).is_some();
             cancel = widgets::button(ui, tr("Cancel"), false, true).clicked();
         });
+        if let Some((_, host)) = app.ui.live.invite.as_ref().filter(|(l, _)| l == link.trim()) {
+            widgets::label(ui, &trf("This invite joins a live session on {host}. Join only if you know who sent it.", &[("host", host)]), t.text);
+        }
         widgets::label(ui, tr("You'll get the shared file as a new tab and edit it together."), t.text_secondary);
         if !app.session.live.can_host() {
             widgets::label(ui, tr(BROWSER_NOTE), t.text_secondary);
         }
     });
     if go {
+        app.ui.live.invite = None;
         return;
     }
     if open && !cancel {
         app.ui.live.join = Some(link);
+    } else {
+        app.ui.live.invite = None;
     }
 }
 

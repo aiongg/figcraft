@@ -856,6 +856,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-docpath"
+version = "0.1.0"
+
+[[package]]
 name = "crc32fast"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1507,6 +1511,7 @@ name = "figcraft-engine"
 version = "0.6.0"
 dependencies = [
  "base64 0.22.1",
+ "craft-docpath",
  "figcraft-collab",
  "figcraft-color",
  "figcraft-doc",

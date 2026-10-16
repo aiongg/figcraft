@@ -21,7 +21,7 @@ and prototype interactions are still unchecked there.
 | `.jam` (FigJam), `.deck` (Slides) | native to other Figma products | no | no | out of scope | — |
 | REST API file JSON (`GET /v1/files/:key`) + local variables JSON + `images/` folder | the API's output | **yes** (`file.open`, `file.import`, CLI) | no | pages, layer tree, geometry, paints, strokes, effects, text runs, vectors, auto layout, constraints, grids, components, sets, instances with overrides, component properties, styles, prototyping (incl. conditionals and variable modes), variables with modes, aliases, scopes and bindings; warnings for what's skipped (video triggers and actions, modifier keys). Unit tests in `crates/format/src/rest/*_tests.rs` | — |
 | `.figcraft` (ours: zip of `document.json` + images, versions inside) | — | yes | yes | streamed JSON, 50k layers save ~0.09 s / load ~0.16 s (`cargo xtask bench`); old files keep opening (`large_tests.rs`) | — |
-| Local library files | team libraries in the cloud | yes (enable a `.figcraft` as a library) | yes (publish) | per-asset versions, updates with overrides kept | see [collaboration-parity](collaboration-parity.md) |
+| Local library files | team libraries in the cloud | yes (enable a `.figcraft` as a library) | yes (publish) | per-asset versions, updates with overrides kept; a library link stored in a file is read only from this computer or the file's own network share (relative links from the file's folder) | see [collaboration-parity](collaboration-parity.md) |
 
 ## Import (place / paste / drop)
 

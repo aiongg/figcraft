@@ -124,12 +124,20 @@ impl Session {
         self.fetch_library(path, false)
     }
 
+    /// The library at `path`, a library link of the active document, as [`load_library`](Self::load_library)
+    /// gives it but without asking a server: a link stored in the document is read as the
+    /// document's file allows ([`crate::doc_path`]).
+    pub fn load_library_file(&mut self, path: &str) -> Result<Arc<PublishedLibrary>> {
+        let document = self.docs.get(crate::branches::file_tab(self)).and_then(|d| d.path.as_deref()).map(std::path::PathBuf::from);
+        self.libraries.load(path, document.as_deref())
+    }
+
     /// [`load_library`](Self::load_library); with `fresh`, a team library's server is asked for a
     /// newer version first (`library.updates`, `library.list`). Fetches report how the active
     /// document uses the library.
     pub fn fetch_library(&mut self, path: &str, fresh: bool) -> Result<Arc<PublishedLibrary>> {
         if !is_server_link(path) {
-            return self.libraries.load(path);
+            return self.load_library_file(path);
         }
         let have = match self.libraries.cached(path) {
             Some(Ok(lib)) if !fresh => return Ok(lib.clone()),

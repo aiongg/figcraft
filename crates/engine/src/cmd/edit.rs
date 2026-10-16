@@ -524,6 +524,10 @@ pub fn copy_to_clipboard(s: &mut Session, ids: &[NodeId]) -> Result<()> {
     let uid = ds.uid;
     let source = Some(ds.doc.clone());
     let source_path = ds.path.clone();
+    // A paste into another file may link this file as a library: it is a file the user opened.
+    if let Some(path) = &source_path {
+        s.libraries.choose(path);
+    }
     s.clipboard.source = source;
     s.clipboard.source_path = source_path;
     s.clipboard.nodes = nodes;

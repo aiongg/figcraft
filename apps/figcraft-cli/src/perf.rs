@@ -504,7 +504,7 @@ fn measure_components(table: &mut Table, col: usize, instances: usize) -> CliRes
     let mut lib_s = Session::with_document(lib_doc);
     table.put(col, "publish the library", timed(&mut lib_s, "library.publish", json!({}), false));
     exec(&mut lib_s, "file.saveAs", json!({"path": path}));
-    let lib = figcraft_engine::library::Cache::default().load(&path).map_err(failed)?;
+    let lib = figcraft_engine::library::Cache::default().load(&path, None).map_err(failed)?;
     let mut doc = Document::new("Consumer");
     let m = &lib.manifest;
     doc.libraries_mut().enabled.push(figcraft_doc::LibraryLink { id: m.id.clone(), name: m.name.clone(), path: path.clone(), version: m.version });

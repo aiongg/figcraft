@@ -24,6 +24,7 @@ pub mod dev_resources;
 pub mod devcompare;
 pub mod devinspect;
 pub mod distance;
+pub mod doc_path;
 pub mod drop;
 pub mod guard;
 pub mod guides;

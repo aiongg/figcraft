@@ -316,9 +316,9 @@ fn bad_library_files_are_errors() {
     let ok = d.join("ok.figcraft");
     std::fs::write(&ok, &good).unwrap();
     let mut cache = Cache::default();
-    let e = cache.load_limited(&path_str(&ok), 16).unwrap_err();
+    let e = cache.load_limited(&path_str(&ok), None, 16).unwrap_err();
     assert!(e.to_string().contains("too large"), "{e}");
-    assert!(cache.load(&path_str(&ok)).is_ok());
+    assert!(cache.load(&path_str(&ok), None).is_ok());
     // Its own library can't be added to a file.
     let own = d.join("own.figcraft");
     ex(&mut lib, "file.saveAs", json!({"path": path_str(&own)}));
@@ -371,6 +371,52 @@ fn library_variants_swaps_and_undo() {
     }
     assert_eq!(s.doc().unwrap().libraries, before.libraries);
     assert_eq!(s.doc().unwrap().node_count(), before.node_count());
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+/// A library link stored in a file is read only when it names a file on this computer or on the
+/// share the file itself is on; a relative link is taken from the file's folder. A library added
+/// in this session is read as given.
+#[test]
+fn stored_library_links_follow_only_local_paths() {
+    let d = dir("stored");
+    let kit_path = d.join("kit.figcraft");
+    let mut lib = Session::new();
+    kit(&mut lib);
+    let id = publish_to(&mut lib, &path_str(&kit_path));
+    let app = path_str(&d.join("app.figcraft"));
+    let mut far = vec![r"\\192.0.2.1\share\kit.figcraft".to_string(), "file://192.0.2.1/s/kit.figcraft".to_string()];
+    if cfg!(unix) {
+        // Read as a local file by Linux, as a share by the resolver.
+        far.push(format!("/{}", path_str(&kit_path)));
+    }
+    let save_with_link = |link: &str| {
+        let mut s = Session::new();
+        ex(&mut s, "library.add", json!({"path": path_str(&kit_path)}));
+        s.doc_mut().unwrap().libraries_mut().enabled[0].path = link.to_string();
+        ex(&mut s, "file.saveAs", json!({"path": app}));
+        let mut back = Session::empty();
+        ex(&mut back, "file.open", json!({"path": app}));
+        back
+    };
+    for link in &far {
+        let mut s = save_with_link(link);
+        let e = s.execute("library.place", &json!({"library": id, "component": "Card", "x": 0, "y": 0})).unwrap_err();
+        assert!(e.to_string().contains("is not opened: the path is on another computer"), "{link}: {e}");
+        assert!(s.load_library_file(link).is_err(), "{link}");
+        // The Assets panel shows why.
+        let shown = s.libraries.cached(link).and_then(|r| r.err()).unwrap_or_default().to_string();
+        assert!(shown.contains("another computer"), "{link}: {shown}");
+    }
+    let mut s = save_with_link("kit.figcraft");
+    ex(&mut s, "library.place", json!({"library": id, "component": "Card", "x": 0, "y": 0}));
+    healthy(&s);
+    if cfg!(unix) {
+        let mut s = Session::new();
+        let picked = far.last().cloned().unwrap_or_default();
+        ex(&mut s, "library.add", json!({"path": picked}));
+        ex(&mut s, "library.place", json!({"library": id, "component": "Card", "x": 0, "y": 0}));
+    }
     let _ = std::fs::remove_dir_all(&d);
 }
 

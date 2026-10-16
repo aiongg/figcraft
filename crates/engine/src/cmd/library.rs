@@ -520,6 +520,7 @@ fn add(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "library.add";
     let raw = req_string(cmd, p, "path")?;
     let path = if is_server_link(&raw) { raw.trim().to_string() } else { absolute_path(raw.trim()) };
+    s.libraries.choose(&path);
     let lib = s.load_library(&path)?;
     let m = &lib.manifest;
     let doc = s.doc()?;

@@ -42,6 +42,7 @@ log = "0.4"
 proptest = "1"
 imbl = { version = "7", features = ["serde"] }
 postcard = { version = "1", default-features = false, features = ["alloc"] }
+craft-docpath = { path = "../secfix-craft-libs/crates/docpath" }
 
 # rendering / formats
 tiny-skia = "0.12"

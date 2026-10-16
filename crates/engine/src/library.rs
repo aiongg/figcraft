@@ -5,13 +5,15 @@
 //!   asset keeps the library version it last changed in, so files using the library update only
 //!   what changed. Variables hidden from publishing stay out unless something published uses them.
 //! - **Read** ([`Cache`]): library files are read read-only (only their library entries, with size
-//!   limits) and again whenever they change on disk. The browser has no file system: there every
-//!   read is a clear error.
+//!   limits) and again whenever they change on disk. A path stored in a document is read only as
+//!   [`crate::doc_path::resolve`] allows; one the user picked in this session is read as given. The
+//!   browser has no file system: there every read is a clear error.
 //! - **Use** ([`import`], [`import_styles`], [`import_variables`]): assets are copied into the
 //!   document's library store as read-only main components, and into its styles and variables as
 //!   read-only linked copies; [`check_read_only`] refuses other edits of them.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::path::Path;
 use std::sync::Arc;
 
 use figcraft_doc::proto::Action;
@@ -448,32 +450,45 @@ struct Stamp {
 
 #[derive(Clone, Debug)]
 struct Entry {
+    /// The file read for the link (None: none was).
+    file: Option<String>,
     stamp: Option<Stamp>,
     result: std::result::Result<Arc<PublishedLibrary>, String>,
 }
 
-/// Library files read by a session, by path (re-read when they change on disk).
+/// Library files read by a session, by the path the link names (re-read when they change on disk).
 #[derive(Clone, Debug, Default)]
 pub struct Cache {
     entries: HashMap<String, Entry>,
+    /// Library paths the user picked in this session ([`choose`](Self::choose)).
+    chosen: HashSet<String>,
 }
 
 impl Cache {
-    /// The published library in the file at `path`.
-    pub fn load(&mut self, path: &str) -> Result<Arc<PublishedLibrary>> {
-        self.load_limited(path, MAX_LIBRARY_FILE)
+    /// The published library in the file at `path`, a library link of the document saved at
+    /// `document` (None: one without a file).
+    pub fn load(&mut self, path: &str, document: Option<&Path>) -> Result<Arc<PublishedLibrary>> {
+        self.load_limited(path, document, MAX_LIBRARY_FILE)
     }
 
     /// [`load`](Self::load), refusing files larger than `max_bytes`. A server library link gives
     /// what was last fetched ([`Session::load_library`](crate::Session::load_library) fetches).
-    pub fn load_limited(&mut self, path: &str, max_bytes: u64) -> Result<Arc<PublishedLibrary>> {
+    pub fn load_limited(&mut self, path: &str, document: Option<&Path>, max_bytes: u64) -> Result<Arc<PublishedLibrary>> {
         if crate::library_server::is_server_link(path) {
             return match self.cached(path) {
                 Some(r) => r.cloned().map_err(|e| EngineError::Other(e.to_string())),
                 None => Err(EngineError::Other(crate::library_server::NOT_FETCHED.into())),
             };
         }
-        let stamp = stat(path);
+        let file = match self.file_of(path, document) {
+            Ok(f) => f,
+            Err(why) => {
+                let e = format!("{path} is not opened: {why}");
+                self.remember(path, Entry { file: None, stamp: None, result: Err(e.clone()) });
+                return Err(EngineError::Other(e));
+            }
+        };
+        let stamp = stat(&file);
         // Checked before the cache: the limit is the caller's.
         if let Ok(st) = &stamp
             && st.len > max_bytes
@@ -482,18 +497,38 @@ impl Cache {
         }
         if let (Some(e), Ok(st)) = (self.entries.get(path), &stamp)
             && e.stamp.as_ref() == Some(st)
+            && e.file.as_deref() == Some(file.as_str())
         {
             return e.result.clone().map_err(EngineError::Other);
         }
         let result = match &stamp {
-            Ok(_) => read_file(path).map(Arc::new),
+            Ok(_) => read_file(&file).map(Arc::new),
             Err(e) => Err(e.clone()),
         };
+        self.remember(path, Entry { file: Some(file), stamp: stamp.ok(), result: result.clone() });
+        result.map_err(EngineError::Other)
+    }
+
+    /// The user picked the library file at `path` in this session (Add library): it is read as
+    /// given, not as a path stored in a document.
+    pub fn choose(&mut self, path: &str) {
+        self.chosen.insert(path.to_string());
+    }
+
+    /// The file to read for library link `path` of the document saved at `document`.
+    fn file_of(&self, path: &str, document: Option<&Path>) -> std::result::Result<String, crate::doc_path::NotFollowed> {
+        // The browser reads no files (`stat` says so).
+        if cfg!(target_arch = "wasm32") || self.chosen.contains(path) {
+            return Ok(path.to_string());
+        }
+        crate::doc_path::resolve(path, document)
+    }
+
+    fn remember(&mut self, path: &str, entry: Entry) {
         if self.entries.len() >= MAX_CACHED && !self.entries.contains_key(path) {
             self.entries.clear();
         }
-        self.entries.insert(path.to_string(), Entry { stamp: stamp.ok(), result: result.clone() });
-        result.map_err(EngineError::Other)
+        self.entries.insert(path.to_string(), entry);
     }
 
     /// What the last read of `path` gave (no file access).
@@ -503,10 +538,7 @@ impl Cache {
 
     /// Remember `result` for `path` (a library fetched from a server).
     pub fn insert(&mut self, path: &str, result: std::result::Result<Arc<PublishedLibrary>, String>) {
-        if self.entries.len() >= MAX_CACHED && !self.entries.contains_key(path) {
-            self.entries.clear();
-        }
-        self.entries.insert(path.to_string(), Entry { stamp: None, result });
+        self.remember(path, Entry { file: None, stamp: None, result });
     }
 }
 

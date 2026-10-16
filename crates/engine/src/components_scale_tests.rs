@@ -450,7 +450,7 @@ fn library_setup(path: &str) -> (Session, DesignSystem, Session, DesignSystem, V
     let mut lib_s = Session::with_document(doc);
     ex(&mut lib_s, "library.publish", json!({}));
     ex(&mut lib_s, "file.saveAs", json!({"path": path}));
-    let lib = crate::library::Cache::default().load(path).unwrap();
+    let lib = crate::library::Cache::default().load(path, None).unwrap();
     let mut doc = Document::new("Consumer");
     let m = &lib.manifest;
     doc.libraries_mut().enabled.push(LibraryLink { id: m.id.clone(), name: m.name.clone(), path: path.to_string(), version: m.version });

@@ -280,7 +280,7 @@ fn refresh_libraries(app: &mut FigApp, ui: &Ui) {
     let last: Option<f64> = ui.data(|d| d.get_temp(id));
     if last.is_none_or(|l| now - l >= LIBRARY_REFRESH) {
         for p in &paths {
-            let _ = app.session.libraries.load(p);
+            let _ = app.session.load_library_file(p);
         }
         ui.data_mut(|d| d.insert_temp(id, now));
         // Team libraries: in the background, at once for one not fetched yet.

@@ -637,7 +637,10 @@ pub fn dev_resources_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, id: 
         crate::a11y::link(&resp, name);
         // Opened only on a click, never fetched.
         if resp.on_hover_text(url.as_str()).clicked() {
-            ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+            match figcraft_doc::proto::openable_url(url) {
+                Some(u) => ui.ctx().open_url(egui::OpenUrl::new_tab(u)),
+                None => log::warn!("dev resource link {url:?} not opened: only http, https and mailto links open"),
+            }
         }
         if let Some(i) = item.index {
             let del = Rect::from_center_size(pos2(r.max.x - PAD - 4.0, r.center().y), vec2(22.0, 22.0));

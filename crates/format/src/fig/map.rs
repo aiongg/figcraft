@@ -1193,7 +1193,9 @@ impl<'a> Mapper<'a> {
                 }
                 act
             }
-            Some("URL") => json!({"type": "URL", "url": a.get("connectionURL").and_then(Kv::str)?}),
+            Some("URL") => {
+                json!({"type": "URL", "url": a.get("connectionURL").and_then(Kv::str).filter(|u| figcraft_doc::proto::openable_url(u).is_some())?})
+            }
             Some("BACK") => json!({"type": "BACK"}),
             Some("CLOSE") => json!({"type": "CLOSE"}),
             Some("NONE") => return None,

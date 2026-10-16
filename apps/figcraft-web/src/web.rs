@@ -99,9 +99,13 @@ impl Services for WebServices {
         figcraft_ui_egui::egui_copy_png(&self.ctx, w, h, rgba);
     }
     fn open_url(&mut self, url: &str) {
+        let Some(u) = figcraft_engine::doc::proto::openable_url(url) else {
+            log::warn!("link {url:?} not opened: only http, https and mailto links open");
+            return;
+        };
         let Some(window) = web_sys::window() else { return };
-        if let Err(e) = window.open_with_url_and_target(url, "_blank") {
-            log::error!("couldn't open {url}: {e:?}");
+        if let Err(e) = window.open_with_url_and_target(u, "_blank") {
+            log::error!("couldn't open {u}: {e:?}");
         }
     }
     fn reduce_motion(&self) -> bool {

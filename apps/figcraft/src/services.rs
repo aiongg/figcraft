@@ -256,7 +256,14 @@ impl Services for Desktop {
         Some((w, h, img.bytes.into_owned()))
     }
     fn open_url(&mut self, url: &str) {
-        let _ = webbrowser::open(url);
+        match figcraft_engine::doc::proto::openable_url(url) {
+            Some(u) => {
+                if let Err(e) = webbrowser::open(u) {
+                    log::warn!("couldn't open {u}: {e}");
+                }
+            }
+            None => log::warn!("link {url:?} not opened: only http, https and mailto links open"),
+        }
     }
     fn reveal_path(&mut self, path: &Path) {
         if let Err(e) = reveal(path) {

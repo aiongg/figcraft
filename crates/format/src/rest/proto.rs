@@ -228,7 +228,14 @@ impl Ctx<'_> {
         let mapped = match text(a, "type") {
             Some("BACK") => Some(Action::Back),
             Some("CLOSE") => Some(Action::CloseOverlay),
-            Some("URL") => text(a, "url").filter(|u| !u.trim().is_empty()).map(|u| Action::OpenUrl { url: u.chars().take(MAX_URL).collect() }),
+            Some("URL") => match text(a, "url").map(str::trim).filter(|u| !u.is_empty()) {
+                Some(u) if figcraft_doc::proto::openable_url(u).is_some() => Some(Action::OpenUrl { url: u.chars().take(MAX_URL).collect() }),
+                Some(_) => {
+                    self.warn("prototype links that aren't http, https or mailto URLs were skipped");
+                    None
+                }
+                None => None,
+            },
             Some("NODE") => {
                 let mapped = self.node_action(a);
                 if mapped.is_some() && transition.is_none() {

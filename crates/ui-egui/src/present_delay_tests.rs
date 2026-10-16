@@ -1,5 +1,6 @@
-//! Delays on mouse enter, leave, down and up triggers, and manual overlay positions, in the
-//! player: gestures go through egui headless on the harness's clock (a frame is 1/60 s).
+//! Delays on mouse enter, leave, down and up triggers, manual overlay positions and the links
+//! "Open link" actions open, in the player: gestures go through egui headless on the harness's
+//! clock (a frame is 1/60 s).
 
 use egui::{Event, Modifiers, PointerButton, Pos2, Rect, pos2, vec2};
 use figcraft_doc::NodeId;
@@ -159,4 +160,55 @@ fn the_player_places_a_manual_overlay_in_page_units() {
     let got = hotspot(&u, item).min;
     let want = h.min + vec2(30.0, 40.0) * scale;
     assert!((got - want).length() < 0.01, "{got:?} vs {want:?} at scale {scale}");
+}
+
+/// Services that record the links the app opens.
+#[derive(Clone, Default)]
+struct Links(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
+
+impl crate::Services for Links {
+    fn open_url(&mut self, url: &str) {
+        self.0.lock().unwrap().push(url.to_string());
+    }
+}
+
+impl Links {
+    fn opened(&self) -> Vec<String> {
+        self.0.lock().unwrap().clone()
+    }
+}
+
+#[test]
+fn links_open_on_a_click_only_and_only_for_web_and_mail() {
+    let mut s = Session::new();
+    let a = frame(&mut s, "A", 0.0, 300.0, 400.0);
+    let b = frame(&mut s, "B", 400.0, 300.0, 400.0);
+    let web = rect(&mut s, a, [20.0, 20.0, 100.0, 60.0]);
+    let script = rect(&mut s, a, [20.0, 120.0, 100.0, 60.0]);
+    let timer = rect(&mut s, a, [20.0, 220.0, 100.0, 60.0]);
+    let click = |id: NodeId, url: &str| json!({"id": id, "trigger": {"type": "onClick"}, "action": {"type": "openUrl", "url": url}});
+    ex(&mut s, "proto.interaction.add", click(web, "https://example.com/"));
+    ex(&mut s, "proto.interaction.add", click(script, "javascript:alert(1)"));
+    // After a delay: the screen changes, the link stays closed.
+    ex(
+        &mut s,
+        "proto.interaction.add",
+        json!({"id": timer, "trigger": {"type": "afterDelay", "ms": 500}, "actions": [
+            {"type": "openUrl", "url": "https://example.com/delayed"},
+            {"type": "navigate", "dest": b}
+        ], "transition": {"type": "instant"}}),
+    );
+    let mut u = Harness::new(s);
+    let links = Links::default();
+    u.app.services = Box::new(links.clone());
+    u.run("proto.present", json!({"start": a}));
+    u.frames(2, Vec::new);
+    let (web_at, script_at) = (hotspot(&u, web).center(), hotspot(&u, script).center());
+    gesture(&mut u, "onClick", web_at);
+    gesture(&mut u, "onClick", script_at);
+    u.frames(2, Vec::new);
+    assert_eq!(links.opened(), ["https://example.com/"]);
+    u.frames(40, Vec::new);
+    assert_eq!(screen(&u), "B", "the delay navigated");
+    assert_eq!(links.opened(), ["https://example.com/"], "the delay opened no link");
 }

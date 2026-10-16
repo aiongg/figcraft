@@ -248,3 +248,20 @@ fn junk_in_conditional_actions_never_panics() {
         }
     }
 }
+
+#[test]
+fn only_web_and_mail_links_are_imported() {
+    let url = |u: &str| json!({"type": "URL", "url": u});
+    let (doc, warnings) = import_file(vec![on(
+        "ON_CLICK",
+        vec![url("javascript:alert(1)"), url("file:///etc/passwd"), url(" https://example.com/a "), url("mailto:a@example.com"), url("smb://host/x")],
+    )]);
+    let urls: Vec<&str> = walk(&button(&doc).interactions[0].actions)
+        .filter_map(|a| match a {
+            Action::OpenUrl { url } => Some(url.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(urls, ["https://example.com/a", "mailto:a@example.com"]);
+    assert!(has(&warnings, "http, https or mailto"), "{warnings:?}");
+}

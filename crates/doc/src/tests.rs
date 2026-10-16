@@ -464,3 +464,26 @@ fn text_style_empty_range_links_and_unlinks_all() {
     e.unlink_text_style(0, 0);
     assert!(e.style.style_id.is_none());
 }
+
+#[test]
+fn only_web_and_mail_links_can_be_opened() {
+    for ok in ["https://example.com/a?b#c", "HTTP://example.com", " mailto:someone@example.com ", "https://example.com/a b"] {
+        assert_eq!(proto::openable_url(ok), Some(ok.trim()), "{ok}");
+    }
+    for bad in [
+        "file:///etc/passwd",
+        "javascript:alert(1)",
+        "JavaScript:alert(1)",
+        "smb://host/share",
+        "ms-msdt:/id",
+        "search-ms:query=x",
+        "data:text/html,<p>",
+        "//example.com",
+        "example.com",
+        "https:",
+        "https://example.com/\nfile:///x",
+        "",
+    ] {
+        assert_eq!(proto::openable_url(bad), None, "{bad:?}");
+    }
+}

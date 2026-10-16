@@ -284,7 +284,11 @@ pub struct Presenter {
     clock: f64,
     /// The layer the Inspect panel shows (the last one under the pointer).
     inspected: Option<NodeId>,
+    /// Links "Open link" actions opened this frame (the app opens them after it).
     urls: Vec<String>,
+    /// The interaction running now was set off by a click, press, drag or key, so its "Open link"
+    /// actions may open their links.
+    links_allowed: bool,
     /// The editor's document as last copied (the player copies it again when it changes).
     source: Option<Arc<Document>>,
     /// Scrolling by dragging: what it scrolls and its offset when the drag began.
@@ -359,6 +363,7 @@ impl Presenter {
             clock: 0.0,
             inspected: None,
             urls: Vec::new(),
+            links_allowed: false,
             source: None,
             drag_scroll: None,
             view: PresentView::default(),
@@ -730,9 +735,11 @@ impl Presenter {
         };
         let snap = if temp.is_some() && self.temp.is_none() { self.snapshot() } else { None };
         let mut did = false;
+        self.links_allowed = it.trigger.opens_links();
         for a in &it.actions {
             did |= self.perform(a, node, it.transition, dur, it.easing, rect, now);
         }
+        self.links_allowed = false;
         if did && let (Some(press), Some(snap), Some(rect)) = (temp, snap, rect) {
             self.temp = Some(Temp { rect, press, snap, transition: it.transition, dur, easing: it.easing });
         }
@@ -850,8 +857,11 @@ impl Presenter {
             }
             Action::CloseOverlay => self.close_overlay(now),
             Action::OpenUrl { url } => {
-                if !url.trim().is_empty() {
-                    self.urls.push(url.clone());
+                match figcraft_doc::proto::openable_url(url) {
+                    Some(u) if self.links_allowed => self.urls.push(u.to_string()),
+                    Some(u) => log::info!("prototype link {u} not opened: only a click, press, drag or key opens a link"),
+                    None if !url.trim().is_empty() => log::warn!("prototype link {url:?} not opened: only http, https and mailto links open"),
+                    None => {}
                 }
                 true
             }

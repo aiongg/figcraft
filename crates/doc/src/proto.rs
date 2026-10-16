@@ -36,6 +36,15 @@ pub enum Trigger {
 }
 
 impl Trigger {
+    /// Whether the trigger is a click, press, drag or key: only those open a link (moving the
+    /// pointer over a layer or waiting never does).
+    pub fn opens_links(&self) -> bool {
+        match self {
+            Trigger::OnClick | Trigger::OnPress | Trigger::OnDrag | Trigger::MouseDown | Trigger::MouseUp | Trigger::KeyPress { .. } => true,
+            Trigger::OnHover | Trigger::MouseEnter | Trigger::MouseLeave | Trigger::AfterDelay { .. } => false,
+        }
+    }
+
     pub fn label(&self) -> String {
         match self {
             Trigger::OnClick => "On click".into(),
@@ -656,6 +665,18 @@ fn retain_at(actions: &mut Vec<Action>, keep: &mut dyn FnMut(&Action) -> bool, d
             _ => true,
         }
     });
+}
+
+/// The schemes a link may have to be opened ("Open link" actions, dev resources).
+pub const LINK_SCHEMES: &[&str] = &["http", "https", "mailto"];
+
+/// `url`, trimmed, when it's a link the app may open: an `http:`, `https:` or `mailto:` URL without
+/// control characters.
+pub fn openable_url(url: &str) -> Option<&str> {
+    let url = url.trim();
+    let (scheme, rest) = url.split_once(':')?;
+    let allowed = LINK_SCHEMES.iter().any(|s| scheme.eq_ignore_ascii_case(s));
+    (allowed && !rest.is_empty() && !url.chars().any(char::is_control)).then_some(url)
 }
 
 impl Action {

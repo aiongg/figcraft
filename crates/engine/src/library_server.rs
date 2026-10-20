@@ -23,7 +23,8 @@ use crate::{EngineError, Result, Session};
 /// What a server library that hasn't been fetched yet says.
 pub const NOT_FETCHED: &str = "the library hasn't been fetched from its server yet";
 /// What a team library from a server not allowed yet in this session says.
-pub const NOT_CONFIRMED: &str = "fetching this file's team libraries from their server needs your go-ahead first: open the Assets panel and choose Fetch";
+pub const NOT_CONFIRMED: &str =
+    "fetching this file's team libraries from their server needs your go-ahead first: open the Assets panel and choose Fetch";
 /// What a server file without a library says.
 pub const NO_LIBRARY: &str = "that file has no library on the server yet: publish it there first (Libraries ▸ Publish to server)";
 /// Most components one usage report lists.

@@ -277,7 +277,11 @@ fn confirm_library_host(app: &mut FigApp, ctx: &egui::Context) {
     let (mut open, mut answer) = (true, None);
     window(tr("Fetch team libraries?"), ctx).id(Id::new("asset_library_host_confirm")).open(&mut open).show(ctx, |ui| {
         ui.set_width(340.0);
-        crate::widgets::label(ui, &trf("This file uses team libraries on {host}. Fetching them connects to that server.", &[("host", &host)]), t.text);
+        crate::widgets::label(
+            ui,
+            &trf("This file uses team libraries on {host}. Fetching them connects to that server.", &[("host", &host)]),
+            t.text,
+        );
         ui.add_space(12.0);
         ui.horizontal(|ui| {
             if crate::widgets::button(ui, tr("Fetch"), true, true).clicked() {

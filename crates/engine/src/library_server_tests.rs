@@ -51,7 +51,10 @@ impl crate::live::LiveLink for Asked {
 #[test]
 fn a_library_link_names_the_server_its_connection_goes_to() {
     // `server` wins over `host`, as when connecting, and is read decoded.
-    assert_eq!(link_host("figcraft://join?host=trusted.example:47900&server=wss://other.example/lib/&file=f&token=t").as_deref(), Some("other.example:443"));
+    assert_eq!(
+        link_host("figcraft://join?host=trusted.example:47900&server=wss://other.example/lib/&file=f&token=t").as_deref(),
+        Some("other.example:443")
+    );
     assert_eq!(link_host("figcraft://join?server=wss%3A%2F%2FEnc.Example%3A9443%2F&file=f&token=t").as_deref(), Some("enc.example:9443"));
     assert_eq!(link_host("figcraft://join?host=10.0.0.2:7000&file=f&token=t").as_deref(), Some("10.0.0.2:7000"));
     assert_eq!(link_host("figcraft://join?file=f&token=t"), None);
@@ -65,7 +68,12 @@ fn a_documents_team_libraries_are_fetched_only_from_servers_the_user_allowed() {
     let (a, b) = ("wss://Libs.Example:8443/file/1?token=t", "figcraft://join?host=10.0.0.2:7000&file=f&token=t");
     let c = "figcraft://join?host=libs.example:8443&server=wss%3A%2F%2Fother.example%2F&file=f&token=t";
     for (id, path) in [("a", a), ("b", b), ("c", c), ("d", "wss://libs.example:8443/file/2")] {
-        s.doc_mut().unwrap().libraries_mut().enabled.push(figcraft_doc::LibraryLink { id: id.into(), name: id.into(), path: path.into(), version: 1 });
+        s.doc_mut().unwrap().libraries_mut().enabled.push(figcraft_doc::LibraryLink {
+            id: id.into(),
+            name: id.into(),
+            path: path.into(),
+            version: 1,
+        });
     }
     assert_eq!(s.library_hosts_to_confirm(), ["10.0.0.2:7000", "libs.example:8443", "other.example:443"]);
     s.refresh_server_libraries();

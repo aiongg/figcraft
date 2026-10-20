@@ -202,7 +202,12 @@ fn files_dialogs_history_and_plugins_are_off_limits() {
 fn plugins_make_no_server_requests_and_load_no_font_files() {
     let mut s = Session::new();
     let link = "wss://server.example/file/1?token=t";
-    s.doc_mut().unwrap().libraries_mut().enabled.push(figcraft_doc::LibraryLink { id: "lib".into(), name: "Team".into(), path: link.into(), version: 1 });
+    s.doc_mut().unwrap().libraries_mut().enabled.push(figcraft_doc::LibraryLink {
+        id: "lib".into(),
+        name: "Team".into(),
+        path: link.into(),
+        version: 1,
+    });
     let refused = [
         ("library.publishToServer", json!({"server": "wss://server.example/?key=k"})),
         ("library.usage", json!({"library": "lib"})),
@@ -218,7 +223,11 @@ fn plugins_make_no_server_requests_and_load_no_font_files() {
         }
     }
     // A team library not fetched yet isn't fetched for a plugin, and the panel's state for it stays.
-    install(&mut s, manifest("org.test.net", "write", &[]), &script(&[("library.place", json!({"library": "lib", "component": "Button"}))], OnRefusal::Report, ""));
+    install(
+        &mut s,
+        manifest("org.test.net", "write", &[]),
+        &script(&[("library.place", json!({"library": "lib", "component": "Button"}))], OnRefusal::Report, ""),
+    );
     let out = ex(&mut s, "plugin.run", json!({"id": "org.test.net"}));
     assert!(out["output"].as_str().is_some_and(|m| m.contains(crate::plugins::NO_SERVERS)), "{out}");
     assert!(s.libraries.cached(link).is_none());

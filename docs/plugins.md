@@ -237,11 +237,13 @@ Whatever its manifest says, FigCraft refuses these calls (the plugin gets the re
 it can handle):
 
 - files and the app: `file.*`, `app.*`, `pref.*`, `help.*`, `library.add`, `libraries.*`,
-  `image.place` with a `path` (pass the image as base64 `data` instead), `variable.export`,
+  `image.place` and `text.loadFont` with a `path` (pass the file as base64 `data` instead), `variable.export`,
   `codeConnect.export` and `component.playground` with a `path` (leave it out to get the result
   back), `codeConnect.import` with a `path` and `variable.import` with a file path instead of JSON,
   `window.*` (new windows open files), `view.theme*`;
 - live sessions and online files: `collab.*`;
+- servers: `library.publishToServer`, `library.usage` and `library.updates`; no other call reaches a
+  server either (a team library not fetched yet is refused, one fetched already is used as it is);
 - other documents and the version history: `doc.*` and `version.*` (except `doc.list` and
   `version.list`);
 - the undo history and nesting: `edit.undo`, `edit.redo`, `edit.repeat`, `command.batch` (a run is

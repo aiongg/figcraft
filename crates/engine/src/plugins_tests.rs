@@ -199,6 +199,33 @@ fn files_dialogs_history_and_plugins_are_off_limits() {
 }
 
 #[test]
+fn plugins_make_no_server_requests_and_load_no_font_files() {
+    let mut s = Session::new();
+    let link = "wss://server.example/file/1?token=t";
+    s.doc_mut().unwrap().libraries_mut().enabled.push(figcraft_doc::LibraryLink { id: "lib".into(), name: "Team".into(), path: link.into(), version: 1 });
+    let refused = [
+        ("library.publishToServer", json!({"server": "wss://server.example/?key=k"})),
+        ("library.usage", json!({"library": "lib"})),
+        ("library.updates", json!({})),
+        ("text.loadFont", json!({"path": "font.ttf"})),
+    ];
+    // An empty command list allows any command the access allows.
+    for access in ["read", "write"] {
+        for (cmd, params) in &refused {
+            install(&mut s, manifest("org.test.net", access, &[]), &script(&[(cmd, params.clone())], OnRefusal::Report, ""));
+            let out = ex(&mut s, "plugin.run", json!({"id": "org.test.net"}));
+            assert!(out["output"].as_str().is_some_and(|m| m.contains("plugins")), "{access} {cmd}: {out}");
+        }
+    }
+    // A team library not fetched yet isn't fetched for a plugin, and the panel's state for it stays.
+    install(&mut s, manifest("org.test.net", "write", &[]), &script(&[("library.place", json!({"library": "lib", "component": "Button"}))], OnRefusal::Report, ""));
+    let out = ex(&mut s, "plugin.run", json!({"id": "org.test.net"}));
+    assert!(out["output"].as_str().is_some_and(|m| m.contains(crate::plugins::NO_SERVERS)), "{out}");
+    assert!(s.libraries.cached(link).is_none());
+    assert!(!s.plugins.calling);
+}
+
+#[test]
 fn traps_endless_loops_and_memory_hogs_roll_back() {
     let mut s = Session::new();
     let a = rect(&mut s, 0.0);

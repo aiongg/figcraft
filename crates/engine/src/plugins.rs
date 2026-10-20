@@ -58,6 +58,8 @@ pub struct Runtime {
     /// The installed plugins or their settings changed since the app last saved the preferences
     /// (it saves them at once, so a crash keeps them).
     pub unsaved: bool,
+    /// A plugin's command call is running: it gets no server requests ([`Session::net`]).
+    pub(crate) calling: bool,
 }
 
 impl Runtime {
@@ -107,6 +109,10 @@ const DENIED: &[&str] = &[
     "plugins.",
     "libraries.",
     "library.add",
+    // Server requests: publishing the document to a server, and what servers report.
+    "library.publishToServer",
+    "library.usage",
+    "library.updates",
     "edit.undo",
     "edit.redo",
     "edit.repeat",
@@ -117,6 +123,9 @@ const DENIED: &[&str] = &[
     "window.",
     "view.theme",
 ];
+/// Why a plugin's call gets no server request.
+pub(crate) const NO_SERVERS: &str = "plugins can't reach servers";
+
 /// Read-only exceptions to [`DENIED`].
 const ALLOWED: &[&str] = &["doc.list", "version.list"];
 
@@ -131,6 +140,9 @@ fn refusal(m: &Manifest, command: &str, params: &Value) -> Option<String> {
     }
     if command == "image.place" && get(params, "path").is_some() {
         return Some("plugins can't read files: pass the image as `data`".into());
+    }
+    if command == "text.loadFont" && get(params, "path").is_some() {
+        return Some("plugins can't read files: pass the font as `data`".into());
     }
     // `path` here is a file on disk (elsewhere it is a vector path or an action's place).
     if matches!(command, "variable.export" | "codeConnect.export" | "component.playground") && get(params, "path").is_some() {
@@ -178,6 +190,7 @@ impl figcraft_plugin::Host for EngineHost<'_> {
         }
         let read_only = self.manifest.permissions.access == Access::Read;
         let ui_before = self.s.ui_requests.len();
+        let calling = std::mem::replace(&mut self.s.plugins.calling, true);
         let r = self.s.grouped(command, |s| {
             let doc = s.ds()?.doc.clone();
             let v = s.execute(command, &params)?;
@@ -191,6 +204,7 @@ impl figcraft_plugin::Host for EngineHost<'_> {
             }
             Ok(v)
         });
+        self.s.plugins.calling = calling;
         r.map(|v| v.to_string()).map_err(|e| e.to_string())
     }
 

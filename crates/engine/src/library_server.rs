@@ -140,6 +140,14 @@ impl Session {
         if !is_server_link(path) {
             return self.load_library_file(path);
         }
+        // A plugin gets what was fetched already; its refusal isn't kept as the library's state.
+        if self.plugins.calling {
+            return match self.libraries.cached(path) {
+                Some(Ok(lib)) => Ok(lib.clone()),
+                Some(Err(e)) => Err(EngineError::Other(e.to_string())),
+                None => Err(EngineError::Other(crate::plugins::NO_SERVERS.into())),
+            };
+        }
         let have = match self.libraries.cached(path) {
             Some(Ok(lib)) if !fresh => return Ok(lib.clone()),
             Some(Ok(lib)) => Some(lib.manifest.version),

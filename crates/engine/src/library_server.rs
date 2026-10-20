@@ -22,6 +22,8 @@ use crate::{EngineError, Result, Session};
 
 /// What a server library that hasn't been fetched yet says.
 pub const NOT_FETCHED: &str = "the library hasn't been fetched from its server yet";
+/// What a team library from a server not allowed yet in this session says.
+pub const NOT_CONFIRMED: &str = "fetching this file's team libraries from their server needs your go-ahead first: open the Assets panel and choose Fetch";
 /// What a server file without a library says.
 pub const NO_LIBRARY: &str = "that file has no library on the server yet: publish it there first (Libraries ▸ Publish to server)";
 /// Most components one usage report lists.
@@ -33,26 +35,11 @@ pub fn is_server_link(path: &str) -> bool {
     ["figcraft://", "ws://", "wss://"].iter().any(|s| p.starts_with(s))
 }
 
-/// The server host (with its port) a team library link names, in lower case: what the app asks
-/// about before it fetches from a server for the first time. A `figcraft://` link names it in its
-/// `host` or `server` parameter; a link without one is its own host.
-pub fn link_host(link: &str) -> String {
-    let link = link.trim();
-    let authority = |url: &str| -> String {
-        let rest = url.split_once("://").map_or(url, |(_, r)| r);
-        let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
-        rest.get(..end).unwrap_or_default().to_ascii_lowercase()
-    };
-    let lower = link.to_ascii_lowercase();
-    if lower.starts_with("figcraft://") {
-        let query = link.split_once('?').map_or("", |(_, q)| q);
-        let param = query.split('&').find_map(|kv| kv.split_once('=').filter(|(k, _)| matches!(*k, "host" | "server")).map(|(_, v)| v));
-        return match param {
-            Some(v) if !v.is_empty() => authority(v),
-            _ => shown_path(link),
-        };
-    }
-    authority(link)
+/// The server (`host:port`, in lower case) a team library link connects to: read as the
+/// connection reads it ([`Invite::endpoint_of`](figcraft_collab::invite::Invite::endpoint_of)), and
+/// what the app asks about before it first fetches from that server. `None`: not a link to a server.
+pub fn link_host(link: &str) -> Option<String> {
+    figcraft_collab::invite::Invite::endpoint_of(link).ok().map(|(e, _)| e.host.to_ascii_lowercase())
 }
 
 /// A library path to show: a server link without its token.
@@ -170,9 +157,15 @@ impl Session {
                 None => Err(EngineError::Other(crate::plugins::NO_SERVERS.into())),
             };
         }
-        let host = link_host(path);
-        if self.libraries.host_allowed(&host) == Some(false) {
-            return Err(EngineError::Other(format!("team libraries aren't fetched from {host} in this session")));
+        // A document's team library link is followed only to a server the user allowed in this
+        // session (in the Assets panel, or by adding the link).
+        let Some(host) = link_host(path) else {
+            return Err(EngineError::Other(format!("{}: not a link to a server", shown_path(path))));
+        };
+        match self.libraries.host_allowed(&host) {
+            Some(true) => {}
+            Some(false) => return Err(EngineError::Other(format!("team libraries aren't fetched from {host} in this session"))),
+            None => return Err(EngineError::Other(format!("{NOT_CONFIRMED} ({host})"))),
         }
         let have = match self.libraries.cached(path) {
             Some(Ok(lib)) if !fresh => return Ok(lib.clone()),
@@ -197,7 +190,7 @@ impl Session {
     /// fetches from a server, the app asks whether to ([`Cache::allow_host`](crate::library::Cache::allow_host)).
     pub fn library_hosts_to_confirm(&self) -> Vec<String> {
         let Ok(doc) = self.doc() else { return Vec::new() };
-        let mut hosts: Vec<String> = doc.libraries.enabled.iter().filter(|l| is_server_link(&l.path)).map(|l| link_host(&l.path)).collect();
+        let mut hosts: Vec<String> = doc.libraries.enabled.iter().filter(|l| is_server_link(&l.path)).filter_map(|l| link_host(&l.path)).collect();
         hosts.sort();
         hosts.dedup();
         hosts.retain(|h| self.libraries.host_allowed(h).is_none());
@@ -213,7 +206,7 @@ impl Session {
             .libraries
             .enabled
             .iter()
-            .filter(|l| is_server_link(&l.path) && self.libraries.host_allowed(&link_host(&l.path)) == Some(true))
+            .filter(|l| is_server_link(&l.path) && self.libraries.link_allowed(&l.path) == Some(true))
             .map(|l| {
                 let have = match self.libraries.cached(&l.path) {
                     Some(Ok(lib)) => Some(lib.manifest.version),

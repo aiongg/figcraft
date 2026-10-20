@@ -16,7 +16,7 @@
 #[cfg(any(target_arch = "wasm32", test))]
 mod driver;
 pub mod inbox;
-pub mod invite;
+pub use figcraft_collab::invite;
 mod join;
 pub mod limits;
 mod sessions;

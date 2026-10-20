@@ -49,22 +49,38 @@ impl crate::live::LiveLink for Asked {
 }
 
 #[test]
+fn a_library_link_names_the_server_its_connection_goes_to() {
+    // `server` wins over `host`, as when connecting, and is read decoded.
+    assert_eq!(link_host("figcraft://join?host=trusted.example:47900&server=wss://other.example/lib/&file=f&token=t").as_deref(), Some("other.example:443"));
+    assert_eq!(link_host("figcraft://join?server=wss%3A%2F%2FEnc.Example%3A9443%2F&file=f&token=t").as_deref(), Some("enc.example:9443"));
+    assert_eq!(link_host("figcraft://join?host=10.0.0.2:7000&file=f&token=t").as_deref(), Some("10.0.0.2:7000"));
+    assert_eq!(link_host("figcraft://join?file=f&token=t"), None);
+}
+
+#[test]
 fn a_documents_team_libraries_are_fetched_only_from_servers_the_user_allowed() {
     let asked = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let mut s = Session::new();
     s.live.install(Box::new(Asked(asked.clone())));
     let (a, b) = ("wss://Libs.Example:8443/file/1?token=t", "figcraft://join?host=10.0.0.2:7000&file=f&token=t");
-    for (id, path) in [("a", a), ("b", b), ("c", "wss://libs.example:8443/file/2")] {
+    let c = "figcraft://join?host=libs.example:8443&server=wss%3A%2F%2Fother.example%2F&file=f&token=t";
+    for (id, path) in [("a", a), ("b", b), ("c", c), ("d", "wss://libs.example:8443/file/2")] {
         s.doc_mut().unwrap().libraries_mut().enabled.push(figcraft_doc::LibraryLink { id: id.into(), name: id.into(), path: path.into(), version: 1 });
     }
-    assert_eq!(s.library_hosts_to_confirm(), ["10.0.0.2:7000", "libs.example:8443"]);
+    assert_eq!(s.library_hosts_to_confirm(), ["10.0.0.2:7000", "libs.example:8443", "other.example:443"]);
     s.refresh_server_libraries();
     assert!(asked.lock().unwrap().is_empty(), "nothing is fetched before the user answers");
+    // Commands (automation) don't fetch from a server nobody was asked about either.
+    for link in [a, c] {
+        let e = s.fetch_library(link, true).unwrap_err().to_string();
+        assert!(e.starts_with(NOT_CONFIRMED), "{e}");
+        assert!(s.libraries.cached(link).is_none());
+    }
     s.libraries.allow_host("libs.example:8443", true);
     s.libraries.allow_host("10.0.0.2:7000", false);
-    assert!(s.library_hosts_to_confirm().is_empty());
+    assert_eq!(s.library_hosts_to_confirm(), ["other.example:443"]);
     s.refresh_server_libraries();
-    assert_eq!(*asked.lock().unwrap(), [a, "wss://libs.example:8443/file/2"]);
+    assert_eq!(*asked.lock().unwrap(), [a, "wss://libs.example:8443/file/2"], "not c: it connects to other.example");
     let e = s.fetch_library(b, true).unwrap_err().to_string();
     assert!(e.contains("10.0.0.2:7000"), "{e}");
     assert!(s.libraries.cached(b).is_none());

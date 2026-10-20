@@ -588,6 +588,18 @@ impl Cache {
 #[cfg(not(target_arch = "wasm32"))]
 fn now() -> Option<std::time::SystemTime> {
     Some(std::time::SystemTime::now())
+    /// [`host_allowed`](Self::host_allowed) for the server team library link `link` connects to.
+    pub fn link_allowed(&self, link: &str) -> Option<bool> {
+        crate::library_server::link_host(link).and_then(|h| self.host_allowed(&h))
+    }
+
+    /// Allow the server team library link `link` connects to: a link the user gave or chose.
+    pub fn allow_link(&mut self, link: &str) {
+        if let Some(h) = crate::library_server::link_host(link) {
+            self.allow_host(&h, true);
+        }
+    }
+
 }
 
 #[cfg(target_arch = "wasm32")]

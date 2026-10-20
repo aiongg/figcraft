@@ -147,6 +147,25 @@ impl Invite {
     /// Read what a join starts from: an invite link, or a server with a join code to ask it about
     /// (then the invite names only the server, until the server says what the code opens).
     pub fn parse_join(link: &str) -> Result<(Invite, Option<String>), String> {
+        let (server, query) = Self::endpoint_of(link)?;
+        let get = |k: &str| query.iter().find(|(key, _)| key == k).map(|(_, v)| v.clone());
+        if let Some(code) = get("code") {
+            let code = crate::code::normalize(&code).ok().filter(|c| c.len() == crate::code::ONLINE_LEN);
+            let code = code.ok_or("the link's join code isn't one")?;
+            return Ok((Invite { server, file: String::new(), token: String::new() }, Some(code)));
+        }
+        let file = get("file").filter(|f| valid_id(f, 1, 64)).ok_or("the invite link has no valid file id")?;
+        let token = get("token").filter(|t| valid_id(t, 16, 128)).ok_or("the invite link has no valid token")?;
+        Ok((Invite { server, file, token }, None))
+    }
+
+    /// The endpoint a link connects to, with its query's pairs (decoded): what [`parse_join`]
+    /// connects to, so also what the app asks about before it first connects to a server named
+    /// by a link that came with a document. A `figcraft://` link's `server` comes before its
+    /// `host`.
+    ///
+    /// [`parse_join`]: Self::parse_join
+    pub fn endpoint_of(link: &str) -> Result<(Endpoint, Vec<(String, String)>), String> {
         let link = clean(link);
         if link.len() > MAX_LINK {
             return Err(NOT.into());
@@ -170,15 +189,7 @@ impl Invite {
         } else {
             return Err(NOT.into());
         };
-        let get = |k: &str| query.iter().find(|(key, _)| key == k).map(|(_, v)| v.clone());
-        if let Some(code) = get("code") {
-            let code = figcraft_collab::code::normalize(&code).ok().filter(|c| c.len() == figcraft_collab::code::ONLINE_LEN);
-            let code = code.ok_or("the link's join code isn't one")?;
-            return Ok((Invite { server, file: String::new(), token: String::new() }, Some(code)));
-        }
-        let file = get("file").filter(|f| valid_id(f, 1, 64)).ok_or("the invite link has no valid file id")?;
-        let token = get("token").filter(|t| valid_id(t, 16, 128)).ok_or("the invite link has no valid token")?;
-        Ok((Invite { server, file, token }, None))
+        Ok((server, query))
     }
 }
 
@@ -210,7 +221,7 @@ fn with_port(authority: &str, default: u16) -> String {
 }
 
 /// Ids and tokens are URL-safe base64 / hex characters.
-pub(crate) fn valid_id(s: &str, min: usize, max: usize) -> bool {
+pub fn valid_id(s: &str, min: usize, max: usize) -> bool {
     (min..=max).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 

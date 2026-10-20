@@ -374,6 +374,8 @@ fn publish_to_server(s: &mut Session, p: &Value) -> Result<Value> {
             bad(cmd, "give `server` (an edit link of this file on a server, or the server's address with its key), or publish this file to a server first (Share ▸ Publish to server…)")
         })?,
     };
+    // The caller named this server (or the file is live there).
+    s.libraries.allow_link(&link);
     // The server's version is the one to follow (others may have published since).
     let current = match s.library_request(&link, LibraryReq::Fetch { have: None, usage: None })? {
         LibraryReply::Library { archive, .. } => Some(read_archive(&archive).map_err(EngineError::Other)?),
@@ -415,7 +417,12 @@ fn usage_cmd(s: &mut Session, p: &Value) -> Result<Value> {
             }
             l.path.clone()
         }
-        None => s.server_link().ok_or_else(|| bad(cmd, "name an enabled team library, or open this file from its server"))?,
+        None => {
+            let link = s.server_link().ok_or_else(|| bad(cmd, "name an enabled team library, or open this file from its server"))?;
+            // The server this file is live on.
+            s.libraries.allow_link(&link);
+            link
+        }
     };
     let lib = s.load_library(&link)?;
     let files = match s.library_request(&link, LibraryReq::Usage)? {
@@ -522,7 +529,7 @@ fn add(s: &mut Session, p: &Value) -> Result<Value> {
     let path = if is_server_link(&raw) { raw.trim().to_string() } else { absolute_path(raw.trim()) };
     // A link given here is one the user chose: its server needs no confirmation.
     if is_server_link(&path) {
-        s.libraries.allow_host(&crate::library_server::link_host(&path), true);
+        s.libraries.allow_link(&path);
     }
     let lib = s.load_library(&path)?;
     let m = &lib.manifest;

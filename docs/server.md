@@ -204,7 +204,9 @@ which other files use without anyone copying the library file around.
   reached, the last version fetched stays in use. The file keeps the link, token included:
   sharing that file shares read access to the library. A file opened with team libraries from a
   server not used yet in this session asks once per server (**Fetch** or **Don't fetch**) before
-  the first request; a link pasted into **Assets ▸ Libraries** needs no confirmation.
+  the first request, and until then commands that would fetch those libraries are refused. A link
+  pasted into **Assets ▸ Libraries** (`library.add`), the server named to `library.publishToServer`
+  and the server the file is live on need no confirmation.
 - **Usage.** Each time a file's app asks for the library it reports which of its components the
   file uses and how often. **Show usage** in the library file (`library.usage`) lists the files and
   the instances of each component. Files are told apart by their names; a file's report changes

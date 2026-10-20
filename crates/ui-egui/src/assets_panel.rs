@@ -18,7 +18,7 @@ use std::sync::Arc;
 use egui::{Align2, Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use figcraft_doc::{Document, NodeId, NodeKind, Style, StyleKind};
 use figcraft_engine::library;
-use figcraft_engine::library_server::{is_server_link, link_host, shown_path};
+use figcraft_engine::library_server::{is_server_link, shown_path};
 use serde_json::{Value, json};
 
 use crate::FigApp;
@@ -1050,7 +1050,7 @@ fn enabled_libraries(app: &mut FigApp, ui: &mut Ui, w: f32, doc: &Document) {
             }
             Some(Ok(_)) => (tr("The file now holds another library").into(), t.danger),
             Some(Err(e)) => (e.to_string(), t.danger),
-            None if is_server_link(&l.path) && app.session.libraries.host_allowed(&link_host(&l.path)) == Some(false) => {
+            None if is_server_link(&l.path) && app.session.libraries.link_allowed(&l.path) == Some(false) => {
                 (tr("Not fetched from its server in this session").into(), t.text_secondary)
             }
             None if is_server_link(&l.path) => (tr("Fetching from the server…").into(), t.text_secondary),

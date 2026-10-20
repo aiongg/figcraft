@@ -57,7 +57,12 @@ fn a_library_link_names_the_server_its_connection_goes_to() {
     );
     assert_eq!(link_host("figcraft://join?server=wss%3A%2F%2FEnc.Example%3A9443%2F&file=f&token=t").as_deref(), Some("enc.example:9443"));
     assert_eq!(link_host("figcraft://join?host=10.0.0.2:7000&file=f&token=t").as_deref(), Some("10.0.0.2:7000"));
+    assert_eq!(link_host("WSS://Libs.Example:8443/file/2?token=t").as_deref(), Some("libs.example:8443"));
+    assert_eq!(link_host("ws://10.0.0.3/").as_deref(), Some("10.0.0.3:80"));
+    assert_eq!(link_host("wss://share.example").as_deref(), Some("share.example:443"));
+    // The connection reads only `figcraft://join?…` links of that scheme, so nothing else names a server.
     assert_eq!(link_host("figcraft://join?file=f&token=t"), None);
+    assert_eq!(link_host("figcraft://library.test/range-styles"), None);
 }
 
 #[test]

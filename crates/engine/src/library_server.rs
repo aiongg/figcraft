@@ -124,19 +124,21 @@ impl Session {
         self.fetch_library(path, false)
     }
 
+    /// The library file that `link`, a library link of the active document, names: resolved
+    /// against the document's folder, and read only from this computer or the document's own
+    /// share ([`Cache::load_file`](crate::library::Cache::load_file)).
+    pub fn load_library_file(&mut self, link: &str) -> Result<Arc<PublishedLibrary>> {
+        let document = self.docs.get(crate::branches::file_tab(self)).and_then(|d| d.path.as_deref()).map(std::path::Path::new);
+        let document = document.map(|d| std::path::absolute(d).unwrap_or_else(|_| d.to_path_buf()));
+        self.libraries.load_file(link, document.as_deref())
+    }
+
     /// [`load_library`](Self::load_library); with `fresh`, a team library's server is asked for a
     /// newer version first (`library.updates`, `library.list`). Fetches report how the active
     /// document uses the library.
     pub fn fetch_library(&mut self, path: &str, fresh: bool) -> Result<Arc<PublishedLibrary>> {
         if !is_server_link(path) {
-            // A library link is stored in the document, so opening someone else's file would
-            // otherwise reach whatever path it names. Only a path on this computer is followed: a
-            // network share would make opening a document contact that server, and on Windows
-            // send the credentials of whoever opened it.
-            if !craft_docpath::is_local(path) {
-                return Err(EngineError::Other(format!("{path}: a library is opened only from this computer")));
-            }
-            return self.libraries.load(path);
+            return self.load_library_file(path);
         }
         let have = match self.libraries.cached(path) {
             Some(Ok(lib)) if !fresh => return Ok(lib.clone()),

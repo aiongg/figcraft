@@ -28,3 +28,42 @@ fn a_local_library_path_is_still_followed() {
     let e = s.fetch_library(&missing.to_string_lossy(), false).expect_err("the file does not exist");
     assert!(!e.to_string().contains("only from this computer"), "a local path must not be refused as remote: {e}");
 }
+
+#[test]
+fn a_relative_library_link_is_taken_from_the_document_folder() {
+    let d = std::env::temp_dir().join(format!("figcraft-relative-library-{}", std::process::id()));
+    std::fs::create_dir_all(d.join("libs")).unwrap();
+    let ok = |s: &mut Session, cmd: &str, p: serde_json::Value| s.execute(cmd, &p).unwrap_or_else(|e| panic!("{cmd}: {e}"));
+    let mut lib = Session::new();
+    let f = ok(&mut lib, "frame.create", serde_json::json!({"x": 0, "y": 0, "width": 10, "height": 10, "name": "Button"}));
+    ok(&mut lib, "component.create", serde_json::json!({"ids": [f["id"]]}));
+    ok(&mut lib, "library.publish", serde_json::json!({}));
+    ok(&mut lib, "file.saveAs", serde_json::json!({"path": d.join("libs").join("kit.figcraft")}));
+
+    let mut unsaved = Session::new();
+    let e = unsaved.fetch_library("libs/kit.figcraft", false).expect_err("an unsaved document has no folder");
+    assert!(e.to_string().contains("not opened"), "{e}");
+    let mut s = Session::new();
+    ok(&mut s, "file.saveAs", serde_json::json!({"path": d.join("doc.figcraft")}));
+    assert!(s.fetch_library("libs/kit.figcraft", false).is_ok());
+    assert!(s.libraries.cached("libs/kit.figcraft").is_some_and(|r| r.is_ok()), "remembered under the link");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn a_share_path_is_refused_on_every_route_before_any_file_access() {
+    let path = r"\\server\share\lib.figcraft";
+    let refused = |e: &crate::EngineError| e.to_string() == format!("{path}: {}", crate::library::NOT_LOCAL);
+    // Every way into the cache; the size limit needs a stat, so it is refused first.
+    let mut cache = crate::library::Cache::default();
+    assert!(cache.load(path).is_err_and(|e| refused(&e)));
+    assert!(cache.load_limited(path, 1).is_err_and(|e| refused(&e)));
+    assert!(cache.load_file(path, None).is_err_and(|e| refused(&e)));
+    // The Assets panel's re-read, then the commands' route.
+    let mut s = Session::new();
+    assert!(s.load_library_file(path).is_err_and(|e| refused(&e)));
+    assert!(s.load_library(path).is_err_and(|e| refused(&e)));
+    assert!(s.fetch_library(path, true).is_err_and(|e| refused(&e)));
+    // What the panel shows for the library.
+    assert!(s.libraries.cached(path).is_some_and(|r| r.is_err_and(|e| e.ends_with(crate::library::NOT_LOCAL))));
+}

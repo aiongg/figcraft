@@ -448,6 +448,8 @@ struct Stamp {
 
 #[derive(Clone, Debug)]
 struct Entry {
+    /// The file read, for a library file.
+    file: Option<String>,
     stamp: Option<Stamp>,
     /// When the file was read: a stamp only proves the file unchanged once its modification time
     /// is safely older than that, since file systems keep the time in coarse ticks.
@@ -470,6 +472,9 @@ impl Entry {
     }
 }
 
+/// Why a library file elsewhere than on this computer (or the document's share) isn't read.
+pub const NOT_LOCAL: &str = "a library is opened only from this computer";
+
 /// Library files read by a session, by path (re-read when they change on disk).
 #[derive(Clone, Debug, Default)]
 pub struct Cache {
@@ -482,36 +487,74 @@ impl Cache {
         self.load_limited(path, MAX_LIBRARY_FILE)
     }
 
-    /// [`load`](Self::load), refusing files larger than `max_bytes`. A server library link gives
-    /// what was last fetched ([`Session::load_library`](crate::Session::load_library) fetches).
+    /// [`load`](Self::load), refusing files larger than `max_bytes`. `path` is taken without a
+    /// document: it must be absolute. A server library link gives what was last fetched
+    /// ([`Session::load_library`](crate::Session::load_library) fetches).
     pub fn load_limited(&mut self, path: &str, max_bytes: u64) -> Result<Arc<PublishedLibrary>> {
-        if crate::library_server::is_server_link(path) {
-            return match self.cached(path) {
+        self.load_link(path, None, max_bytes)
+    }
+
+    /// [`load`](Self::load) of the file that library link `link` of the document at `document`
+    /// names, remembered under `link`
+    /// ([`Session::load_library_file`](crate::Session::load_library_file)).
+    pub fn load_file(&mut self, link: &str, document: Option<&std::path::Path>) -> Result<Arc<PublishedLibrary>> {
+        self.load_link(link, document, MAX_LIBRARY_FILE)
+    }
+
+    /// Every library file read goes through here. A library link is stored in the document, so
+    /// opening someone else's file would otherwise reach whatever path it names: it is resolved
+    /// with [`craft_docpath::resolve_absolute`], which takes a relative link from the document's
+    /// folder and follows only a path on this computer or on the document's own share. Anything
+    /// else is refused before it is stat'ed or opened (another share would make opening a
+    /// document contact that server), and the refusal is remembered like a failed read so the
+    /// Assets panel shows it.
+    fn load_link(&mut self, link: &str, document: Option<&std::path::Path>, max_bytes: u64) -> Result<Arc<PublishedLibrary>> {
+        if crate::library_server::is_server_link(link) {
+            return match self.cached(link) {
                 Some(r) => r.cloned().map_err(|e| EngineError::Other(e.to_string())),
                 None => Err(EngineError::Other(crate::library_server::NOT_FETCHED.into())),
             };
         }
-        let stamp = stat(path);
+        // The browser reads no files ([`stat`] says so).
+        if cfg!(target_arch = "wasm32") {
+            return self.read(link, link, max_bytes);
+        }
+        match craft_docpath::resolve_absolute(link, document) {
+            Ok(file) => self.read(link, &file.to_string_lossy(), max_bytes),
+            Err(why) => {
+                let e = match why {
+                    craft_docpath::Refused::Invalid => format!("{link} is not opened: {why}"),
+                    _ => format!("{link}: {NOT_LOCAL}"),
+                };
+                self.insert(link, Err(e.clone()));
+                Err(EngineError::Other(e))
+            }
+        }
+    }
+
+    fn read(&mut self, path: &str, file: &str, max_bytes: u64) -> Result<Arc<PublishedLibrary>> {
+        let stamp = stat(file);
         // Checked before the cache: the limit is the caller's.
         if let Ok(st) = &stamp
             && st.len > max_bytes
         {
-            return Err(EngineError::Other(format!("{path} is too large to use as a library (the limit is {} MB)", max_bytes / 1024 / 1024)));
+            return Err(EngineError::Other(format!("{file} is too large to use as a library (the limit is {} MB)", max_bytes / 1024 / 1024)));
         }
         if let (Some(e), Ok(st)) = (self.entries.get(path), &stamp)
+            && e.file.as_deref() == Some(file)
             && e.still_valid(st)
         {
             return e.result.clone().map_err(EngineError::Other);
         }
         let read_at = now();
         let result = match &stamp {
-            Ok(_) => read_file(path).map(Arc::new),
+            Ok(_) => read_file(file).map(Arc::new),
             Err(e) => Err(e.clone()),
         };
         if self.entries.len() >= MAX_CACHED && !self.entries.contains_key(path) {
             self.entries.clear();
         }
-        self.entries.insert(path.to_string(), Entry { stamp: stamp.ok(), read_at, result: result.clone() });
+        self.entries.insert(path.to_string(), Entry { file: Some(file.to_string()), stamp: stamp.ok(), read_at, result: result.clone() });
         result.map_err(EngineError::Other)
     }
 
@@ -525,7 +568,7 @@ impl Cache {
         if self.entries.len() >= MAX_CACHED && !self.entries.contains_key(path) {
             self.entries.clear();
         }
-        self.entries.insert(path.to_string(), Entry { stamp: None, read_at: None, result });
+        self.entries.insert(path.to_string(), Entry { file: None, stamp: None, read_at: None, result });
     }
 }
 

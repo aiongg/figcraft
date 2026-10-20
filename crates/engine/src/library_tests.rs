@@ -451,6 +451,7 @@ fn a_file_stamp_from_the_moment_it_was_read_does_not_prove_it_unchanged() {
     use std::time::{Duration, SystemTime};
     let read_at = SystemTime::now();
     let entry = |modified: SystemTime| Entry {
+        file: None,
         stamp: Some(Stamp { len: 10, modified: Some(modified) }),
         read_at: Some(read_at),
         result: Err("unused".into()),

@@ -46,7 +46,12 @@ fn a_relative_library_link_is_taken_from_the_document_folder() {
     let mut s = Session::new();
     ok(&mut s, "file.saveAs", serde_json::json!({"path": d.join("doc.figcraft")}));
     assert!(s.fetch_library("libs/kit.figcraft", false).is_ok());
-    assert!(s.libraries.cached("libs/kit.figcraft").is_some_and(|r| r.is_ok()), "remembered under the link");
+    assert!(s.cached_library("libs/kit.figcraft").is_some_and(|r| r.is_ok()), "what the panel shows");
+    // Another document with the same link in another folder doesn't see that library.
+    let mut other = Session::new();
+    ok(&mut other, "file.saveAs", serde_json::json!({"path": d.join("libs").join("doc.figcraft")}));
+    other.libraries = s.libraries.clone();
+    assert!(other.cached_library("libs/kit.figcraft").is_none());
     let _ = std::fs::remove_dir_all(&d);
 }
 
@@ -65,5 +70,5 @@ fn a_share_path_is_refused_on_every_route_before_any_file_access() {
     assert!(s.load_library(path).is_err_and(|e| refused(&e)));
     assert!(s.fetch_library(path, true).is_err_and(|e| refused(&e)));
     // What the panel shows for the library.
-    assert!(s.libraries.cached(path).is_some_and(|r| r.is_err_and(|e| e.ends_with(crate::library::NOT_LOCAL))));
+    assert!(s.cached_library(path).is_some_and(|r| r.is_err_and(|e| e.ends_with(crate::library::NOT_LOCAL))));
 }

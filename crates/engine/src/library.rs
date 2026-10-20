@@ -523,7 +523,12 @@ impl Cache {
             return self.read(link, link, max_bytes);
         }
         match craft_docpath::resolve_absolute(link, document) {
-            Ok(file) => self.read(link, &file.to_string_lossy(), max_bytes),
+            // Kept by file: the same relative link of two documents in different folders names
+            // two files ([`cached_link`](Self::cached_link) looks it up).
+            Ok(file) => {
+                let file = file.to_string_lossy();
+                self.read(&file, &file, max_bytes)
+            }
             Err(why) => {
                 let e = match why {
                     craft_docpath::Refused::Invalid => format!("{link} is not opened: {why}"),
@@ -561,6 +566,18 @@ impl Cache {
         result.map_err(EngineError::Other)
     }
 
+    /// What the last read of library link `link` of the document at `document` gave (no file
+    /// access): the file it resolves to, else the link's refusal (or a server link's fetch).
+    pub fn cached_link(&self, link: &str, document: Option<&std::path::Path>) -> Option<std::result::Result<&Arc<PublishedLibrary>, &str>> {
+        if crate::library_server::is_server_link(link) || cfg!(target_arch = "wasm32") {
+            return self.cached(link);
+        }
+        match craft_docpath::resolve_absolute(link, document) {
+            Ok(file) => self.cached(&file.to_string_lossy()),
+            Err(_) => self.cached(link),
+        }
+    }
+
     /// What the last read of `path` gave (no file access).
     pub fn cached(&self, path: &str) -> Option<std::result::Result<&Arc<PublishedLibrary>, &str>> {
         self.entries.get(path).map(|e| e.result.as_ref().map_err(String::as_str))
@@ -569,6 +586,18 @@ impl Cache {
     /// Whether team libraries are fetched from server `host` in this session (`None`: not asked).
     pub fn host_allowed(&self, host: &str) -> Option<bool> {
         self.hosts.get(host).copied()
+    }
+
+    /// [`host_allowed`](Self::host_allowed) for the server team library link `link` connects to.
+    pub fn link_allowed(&self, link: &str) -> Option<bool> {
+        crate::library_server::link_host(link).and_then(|h| self.host_allowed(&h))
+    }
+
+    /// Allow the server team library link `link` connects to: a link the user gave or chose.
+    pub fn allow_link(&mut self, link: &str) {
+        if let Some(h) = crate::library_server::link_host(link) {
+            self.allow_host(&h, true);
+        }
     }
 
     /// Remember whether team libraries are fetched from server `host` in this session.
@@ -588,18 +617,6 @@ impl Cache {
 #[cfg(not(target_arch = "wasm32"))]
 fn now() -> Option<std::time::SystemTime> {
     Some(std::time::SystemTime::now())
-    /// [`host_allowed`](Self::host_allowed) for the server team library link `link` connects to.
-    pub fn link_allowed(&self, link: &str) -> Option<bool> {
-        crate::library_server::link_host(link).and_then(|h| self.host_allowed(&h))
-    }
-
-    /// Allow the server team library link `link` connects to: a link the user gave or chose.
-    pub fn allow_link(&mut self, link: &str) {
-        if let Some(h) = crate::library_server::link_host(link) {
-            self.allow_host(&h, true);
-        }
-    }
-
 }
 
 #[cfg(target_arch = "wasm32")]

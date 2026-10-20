@@ -137,9 +137,20 @@ impl Session {
     /// against the document's folder, and read only from this computer or the document's own
     /// share ([`Cache::load_file`](crate::library::Cache::load_file)).
     pub fn load_library_file(&mut self, link: &str) -> Result<Arc<PublishedLibrary>> {
-        let document = self.docs.get(crate::branches::file_tab(self)).and_then(|d| d.path.as_deref()).map(std::path::Path::new);
-        let document = document.map(|d| std::path::absolute(d).unwrap_or_else(|_| d.to_path_buf()));
+        let document = self.library_document();
         self.libraries.load_file(link, document.as_deref())
+    }
+
+    /// What the last read or fetch of `link`, a library link of the active document, gave (no
+    /// file access; what the Assets panel shows).
+    pub fn cached_library(&self, link: &str) -> Option<std::result::Result<&Arc<PublishedLibrary>, &str>> {
+        self.libraries.cached_link(link, self.library_document().as_deref())
+    }
+
+    /// The file the active document's library links are relative to.
+    fn library_document(&self) -> Option<std::path::PathBuf> {
+        let document = self.docs.get(crate::branches::file_tab(self)).and_then(|d| d.path.as_deref()).map(std::path::Path::new);
+        document.map(|d| std::path::absolute(d).unwrap_or_else(|_| d.to_path_buf()))
     }
 
     /// [`load_library`](Self::load_library); with `fresh`, a team library's server is asked for a

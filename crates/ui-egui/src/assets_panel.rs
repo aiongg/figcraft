@@ -223,7 +223,7 @@ fn libraries_key(app: &FigApp, doc: &Document) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for l in &doc.libraries.enabled {
         l.id.hash(&mut h);
-        match app.session.libraries.cached(&l.path) {
+        match app.session.cached_library(&l.path) {
             Some(Ok(lib)) => (Arc::as_ptr(lib) as usize).hash(&mut h),
             Some(Err(e)) => e.hash(&mut h),
             None => 0u8.hash(&mut h),
@@ -244,7 +244,7 @@ fn build_listing(app: &FigApp, doc: &Document, q: &str, key: (u64, String, u64))
     let mut libraries = Vec::new();
     for l in &doc.libraries.enabled {
         let mut sec = Section { id: l.id.clone(), name: l.name.clone(), doc: None, error: None, tiles: Vec::new(), styles: Vec::new() };
-        match app.session.libraries.cached(&l.path) {
+        match app.session.cached_library(&l.path) {
             Some(Ok(lib)) if lib.manifest.id == l.id => {
                 updates += library::pending(doc, lib).count();
                 let m = &lib.manifest;
@@ -1029,7 +1029,7 @@ fn enabled_libraries(app: &mut FigApp, ui: &mut Ui, w: f32, doc: &Document) {
     let swappable = doc.libraries.enabled.len() > 1;
     for l in &doc.libraries.enabled {
         let (r, _) = ui.allocate_exact_size(vec2(w, 44.0), Sense::hover());
-        let status = match app.session.libraries.cached(&l.path) {
+        let status = match app.session.cached_library(&l.path) {
             Some(Ok(lib)) if lib.manifest.id == l.id => {
                 let m = &lib.manifest;
                 let n = m.components.iter().filter(|a| a.published).count();

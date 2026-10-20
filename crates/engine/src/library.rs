@@ -448,6 +448,8 @@ struct Stamp {
 
 #[derive(Clone, Debug)]
 struct Entry {
+    /// The file read, for a library file.
+    file: Option<String>,
     stamp: Option<Stamp>,
     /// When the file was read: a stamp only proves the file unchanged once its modification time
     /// is safely older than that, since file systems keep the time in coarse ticks.
@@ -485,33 +487,45 @@ impl Cache {
     /// [`load`](Self::load), refusing files larger than `max_bytes`. A server library link gives
     /// what was last fetched ([`Session::load_library`](crate::Session::load_library) fetches).
     pub fn load_limited(&mut self, path: &str, max_bytes: u64) -> Result<Arc<PublishedLibrary>> {
+        self.read(path, path, max_bytes)
+    }
+
+    /// [`load`](Self::load) of the file at `file`, remembered under `link`: the library link stored
+    /// in a document that `file` was resolved from
+    /// ([`Session::load_library_file`](crate::Session::load_library_file)).
+    pub fn load_file(&mut self, link: &str, file: &str) -> Result<Arc<PublishedLibrary>> {
+        self.read(link, file, MAX_LIBRARY_FILE)
+    }
+
+    fn read(&mut self, path: &str, file: &str, max_bytes: u64) -> Result<Arc<PublishedLibrary>> {
         if crate::library_server::is_server_link(path) {
             return match self.cached(path) {
                 Some(r) => r.cloned().map_err(|e| EngineError::Other(e.to_string())),
                 None => Err(EngineError::Other(crate::library_server::NOT_FETCHED.into())),
             };
         }
-        let stamp = stat(path);
+        let stamp = stat(file);
         // Checked before the cache: the limit is the caller's.
         if let Ok(st) = &stamp
             && st.len > max_bytes
         {
-            return Err(EngineError::Other(format!("{path} is too large to use as a library (the limit is {} MB)", max_bytes / 1024 / 1024)));
+            return Err(EngineError::Other(format!("{file} is too large to use as a library (the limit is {} MB)", max_bytes / 1024 / 1024)));
         }
         if let (Some(e), Ok(st)) = (self.entries.get(path), &stamp)
+            && e.file.as_deref() == Some(file)
             && e.still_valid(st)
         {
             return e.result.clone().map_err(EngineError::Other);
         }
         let read_at = now();
         let result = match &stamp {
-            Ok(_) => read_file(path).map(Arc::new),
+            Ok(_) => read_file(file).map(Arc::new),
             Err(e) => Err(e.clone()),
         };
         if self.entries.len() >= MAX_CACHED && !self.entries.contains_key(path) {
             self.entries.clear();
         }
-        self.entries.insert(path.to_string(), Entry { stamp: stamp.ok(), read_at, result: result.clone() });
+        self.entries.insert(path.to_string(), Entry { file: Some(file.to_string()), stamp: stamp.ok(), read_at, result: result.clone() });
         result.map_err(EngineError::Other)
     }
 
@@ -525,7 +539,7 @@ impl Cache {
         if self.entries.len() >= MAX_CACHED && !self.entries.contains_key(path) {
             self.entries.clear();
         }
-        self.entries.insert(path.to_string(), Entry { stamp: None, read_at: None, result });
+        self.entries.insert(path.to_string(), Entry { file: None, stamp: None, read_at: None, result });
     }
 }
 

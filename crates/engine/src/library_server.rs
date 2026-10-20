@@ -33,6 +33,28 @@ pub fn is_server_link(path: &str) -> bool {
     ["figcraft://", "ws://", "wss://"].iter().any(|s| p.starts_with(s))
 }
 
+/// The server host (with its port) a team library link names, in lower case: what the app asks
+/// about before it fetches from a server for the first time. A `figcraft://` link names it in its
+/// `host` or `server` parameter; a link without one is its own host.
+pub fn link_host(link: &str) -> String {
+    let link = link.trim();
+    let authority = |url: &str| -> String {
+        let rest = url.split_once("://").map_or(url, |(_, r)| r);
+        let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+        rest.get(..end).unwrap_or_default().to_ascii_lowercase()
+    };
+    let lower = link.to_ascii_lowercase();
+    if lower.starts_with("figcraft://") {
+        let query = link.split_once('?').map_or("", |(_, q)| q);
+        let param = query.split('&').find_map(|kv| kv.split_once('=').filter(|(k, _)| matches!(*k, "host" | "server")).map(|(_, v)| v));
+        return match param {
+            Some(v) if !v.is_empty() => authority(v),
+            _ => shown_path(link),
+        };
+    }
+    authority(link)
+}
+
 /// A library path to show: a server link without its token.
 pub fn shown_path(path: &str) -> String {
     if !is_server_link(path) {
@@ -148,6 +170,10 @@ impl Session {
                 None => Err(EngineError::Other(crate::plugins::NO_SERVERS.into())),
             };
         }
+        let host = link_host(path);
+        if self.libraries.host_allowed(&host) == Some(false) {
+            return Err(EngineError::Other(format!("team libraries aren't fetched from {host} in this session")));
+        }
         let have = match self.libraries.cached(path) {
             Some(Ok(lib)) if !fresh => return Ok(lib.clone()),
             Some(Ok(lib)) => Some(lib.manifest.version),
@@ -166,15 +192,28 @@ impl Session {
         self.take_library(path, reply).map_err(EngineError::Other)
     }
 
+    /// The server hosts of the active document's team libraries not asked about yet in this
+    /// session. A team library link comes with the document, so before the Assets panel first
+    /// fetches from a server, the app asks whether to ([`Cache::allow_host`](crate::library::Cache::allow_host)).
+    pub fn library_hosts_to_confirm(&self) -> Vec<String> {
+        let Ok(doc) = self.doc() else { return Vec::new() };
+        let mut hosts: Vec<String> = doc.libraries.enabled.iter().filter(|l| is_server_link(&l.path)).map(|l| link_host(&l.path)).collect();
+        hosts.sort();
+        hosts.dedup();
+        hosts.retain(|h| self.libraries.host_allowed(h).is_none());
+        hosts
+    }
+
     /// Ask the servers of the active document's team libraries for newer versions, in the
     /// background, reporting how the document uses each (the Assets panel calls it now and then).
+    /// Only servers allowed in this session are asked ([`Self::library_hosts_to_confirm`]).
     pub fn refresh_server_libraries(&mut self) {
         let Ok(doc) = self.doc() else { return };
         let jobs: Vec<(String, LibraryReq)> = doc
             .libraries
             .enabled
             .iter()
-            .filter(|l| is_server_link(&l.path))
+            .filter(|l| is_server_link(&l.path) && self.libraries.host_allowed(&link_host(&l.path)) == Some(true))
             .map(|l| {
                 let have = match self.libraries.cached(&l.path) {
                     Some(Ok(lib)) => Some(lib.manifest.version),

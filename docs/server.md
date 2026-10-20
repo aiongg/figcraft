@@ -202,7 +202,9 @@ which other files use without anyone copying the library file around.
   newer version at once and then every 30 seconds (a few bytes when nothing changed) and shows
   **Library updates available**; accepting keeps instance overrides. While the server can't be
   reached, the last version fetched stays in use. The file keeps the link, token included:
-  sharing that file shares read access to the library.
+  sharing that file shares read access to the library. A file opened with team libraries from a
+  server not used yet in this session asks once per server (**Fetch** or **Don't fetch**) before
+  the first request; a link pasted into **Assets ▸ Libraries** needs no confirmation.
 - **Usage.** Each time a file's app asks for the library it reports which of its components the
   file uses and how often. **Show usage** in the library file (`library.usage`) lists the files and
   the instances of each component. Files are told apart by their names; a file's report changes

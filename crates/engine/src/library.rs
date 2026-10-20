@@ -479,6 +479,9 @@ pub const NOT_LOCAL: &str = "a library is opened only from this computer";
 #[derive(Clone, Debug, Default)]
 pub struct Cache {
     entries: HashMap<String, Entry>,
+    /// Whether team libraries are fetched from each server host (see
+    /// [`Session::library_hosts_to_confirm`](crate::Session::library_hosts_to_confirm)).
+    hosts: HashMap<String, bool>,
 }
 
 impl Cache {
@@ -561,6 +564,16 @@ impl Cache {
     /// What the last read of `path` gave (no file access).
     pub fn cached(&self, path: &str) -> Option<std::result::Result<&Arc<PublishedLibrary>, &str>> {
         self.entries.get(path).map(|e| e.result.as_ref().map_err(String::as_str))
+    }
+
+    /// Whether team libraries are fetched from server `host` in this session (`None`: not asked).
+    pub fn host_allowed(&self, host: &str) -> Option<bool> {
+        self.hosts.get(host).copied()
+    }
+
+    /// Remember whether team libraries are fetched from server `host` in this session.
+    pub fn allow_host(&mut self, host: &str, allow: bool) {
+        self.hosts.insert(host.to_string(), allow);
     }
 
     /// Remember `result` for `path` (a library fetched from a server).

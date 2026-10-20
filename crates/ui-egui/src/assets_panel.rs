@@ -18,11 +18,12 @@ use std::sync::Arc;
 use egui::{Align2, Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use figcraft_doc::{Document, NodeId, NodeKind, Style, StyleKind};
 use figcraft_engine::library;
-use figcraft_engine::library_server::{is_server_link, shown_path};
+use figcraft_engine::library_server::{is_server_link, link_host, shown_path};
 use serde_json::{Value, json};
 
 use crate::FigApp;
 use crate::a11y::Tip;
+use crate::dialogs::window;
 use crate::i18n::{tr, trf, trn};
 use crate::icons::{self, Icon};
 use crate::theme::{COMPONENT, Tokens, regular, semibold};
@@ -266,6 +267,30 @@ fn build_listing(app: &FigApp, doc: &Document, q: &str, key: (u64, String, u64))
         }
     }
     Listing { key, local: foldered("", local), local_styles, libraries, updates }
+}
+
+/// A team library link comes with the document: before the first fetch from a server in this
+/// session, ask whether to connect to it. Closing the window counts as no.
+fn confirm_library_host(app: &mut FigApp, ctx: &egui::Context) {
+    let Some(host) = app.session.library_hosts_to_confirm().into_iter().next() else { return };
+    let t = Tokens::get(ctx);
+    let (mut open, mut answer) = (true, None);
+    window(tr("Fetch team libraries?"), ctx).id(Id::new("asset_library_host_confirm")).open(&mut open).show(ctx, |ui| {
+        ui.set_width(340.0);
+        crate::widgets::label(ui, &trf("This file uses team libraries on {host}. Fetching them connects to that server.", &[("host", &host)]), t.text);
+        ui.add_space(12.0);
+        ui.horizontal(|ui| {
+            if crate::widgets::button(ui, tr("Fetch"), true, true).clicked() {
+                answer = Some(true);
+            }
+            if crate::widgets::button(ui, tr("Don't fetch"), false, true).clicked() {
+                answer = Some(false);
+            }
+        });
+    });
+    if let Some(allow) = answer.or((!open).then_some(false)) {
+        app.session.libraries.allow_host(&host, allow);
+    }
 }
 
 /// Re-read enabled library files that changed on disk (throttled).
@@ -580,6 +605,7 @@ fn render_thumbs(ui: &Ui, w: f32, thumbs: &mut Thumbs, wanted: &[(Source, NodeId
 }
 
 pub fn show(app: &mut FigApp, ui: &mut Ui) {
+    confirm_library_host(app, ui.ctx());
     refresh_libraries(app, ui);
     if app.ui.libraries {
         libraries_view(app, ui);
@@ -1024,6 +1050,9 @@ fn enabled_libraries(app: &mut FigApp, ui: &mut Ui, w: f32, doc: &Document) {
             }
             Some(Ok(_)) => (tr("The file now holds another library").into(), t.danger),
             Some(Err(e)) => (e.to_string(), t.danger),
+            None if is_server_link(&l.path) && app.session.libraries.host_allowed(&link_host(&l.path)) == Some(false) => {
+                (tr("Not fetched from its server in this session").into(), t.text_secondary)
+            }
             None if is_server_link(&l.path) => (tr("Fetching from the server…").into(), t.text_secondary),
             None => (tr("Not read yet").into(), t.text_secondary),
         };

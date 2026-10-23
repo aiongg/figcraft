@@ -1,6 +1,6 @@
 # Localization parity
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-17 · **Change:** minor (macOS finds its downloadable CJK system fonts (#406); string counts re-measured: 2,272 entries, the drafts at 95–99%; Swedish command labels and menu wordings; Russian, Swedish, Turkish, Czech and Indonesian listed; a duplicated paragraph removed; draft catalogs catch up: every draft translates every string again; Simplified Chinese draft catalog) · **Target:** Figma Design (desktop app 126.10.7)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-23 · **Change:** minor (a missing translation fails no check: `cargo xtask i18n-report` lists them; macOS finds its downloadable CJK system fonts (#406); string counts re-measured: 2,272 entries, the drafts at 95–99%; Swedish command labels and menu wordings; Russian, Swedish, Turkish, Czech and Indonesian listed; a duplicated paragraph removed; draft catalogs catch up: every draft translates every string again; Simplified Chinese draft catalog) · **Target:** Figma Design (desktop app 126.10.7)
 
 FigCraft's interface has a localization layer with an English catalog, a Russian catalog reviewed
 by a native speaker, and Spanish (with a Latin American overlay), French, German, Brazilian
@@ -45,11 +45,11 @@ supported by both apps (CJK, Arabic and Devanagari shaping, IME); Figma has no v
   (`es-419.toml` over `es.toml`); its UI strings, command labels and menu wordings read the
   overlay, then the base language, then English.
 - **Check:** `cargo test -p figcraft-ui-egui i18n` fails on keys the code uses that `en.toml`
-  lacks, keys no code uses, unknown command ids, placeholders that differ from English, overlay
-  entries that read as in their base language and, for complete languages (Spanish), anything
-  untranslated. The other catalogs are not held to it: a string added later shows English there
-  until someone translates it. Every draft translated every string on 2026-10-12; by 2026-10-17
-  the strings added since left them at 95–99% (table below).
+  lacks, keys no code uses, unknown command ids, placeholders that differ from English and overlay
+  entries that read as in their base language. No language is held to full coverage: a string
+  added later shows English until someone translates it, and `cargo xtask i18n-report` (part of
+  `cargo xtask ci`) lists what each language lacks. Every draft translated every string on
+  2026-10-12; by 2026-10-17 the strings added since left them at 95–99% (table below).
 - **Not yet localized:** messages the engine writes (errors, a few toasts, Dev Mode property values
   such as "inside"), number formatting (decimal points stay `.`), and decimal plural rules
   (`trn` takes integers: Czech uses one/few/other and Russian one/few/many; French and Brazilian
@@ -120,6 +120,7 @@ Hindi, Vietnamese and Arabic. Traditional Chinese is not planned (no catalog; it
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-23 | minor | A missing translation fails no check: Spanish is no longer held to full coverage, and the tests of one language's wording, names and plural forms are gone (the plural rules and language-tag tests stay). `cargo xtask i18n-report`, run by `cargo xtask ci`, lists each language's missing UI strings, command labels and menu wordings. Grade unchanged |
 | 2026-10-17 | minor | Chinese showed as boxes on macOS (#406): the font scan also walks the system's downloaded font assets (`/System/Library/AssetsV2` and the older `/System/Library/Assets`, only their `com_apple_MobileAsset_Font*` folders), where current versions keep PingFang SC, and Hiragino Sans GB and Heiti SC join the Chinese UI faces and the text fallbacks. Tested with a folder laid out the same way; not yet run on a Mac |
 | 2026-10-17 | minor | String counts re-measured from the catalogs: 1,680 UI keys, 561 command labels and 31 menu wordings (2,272 entries); Spanish complete, the other drafts at 95.3–99.2% (strings added since 2026-10-12 show English), es-419 101 entries. Indonesian has a draft (98.8%; it was listed as none); Russian (98.8%, reviewed), Swedish (99.6%, command labels and menu wordings from #599), Turkish (98.7%) and Czech (98.8%) listed with counts; the language picker's list updated; a paragraph repeated by a merge removed. Grade and hours unchanged (Indonesian's draft is offset by the drafts' new gaps) |
 | 2026-10-14 | minor | Windows UI language (#291): the interface language comes from Windows' first preferred language alone; that list is also the input-language list (a German keyboard on a Polish system adds Deutsch), and taking the first entry with a catalog turned the interface German there. A first preferred language without a catalog reads English; macOS AppleLanguages and gettext's `LANGUAGE` still take the first language with a catalog |

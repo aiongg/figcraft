@@ -21,6 +21,9 @@ jobs:
     # Tracks @main so suite-wide CI fixes reach every app without a PR in each repository.
     uses: storytold/craft-common-actions/.github/workflows/gate.yml@main
     with:
+      # Without craft-fonts (the optional CRAFT_FONTS_DIR input, which .cargo/config.toml points at
+      # a sibling checkout that CI doesn't have): everything must build and pass without it.
+      craft-fonts-ref: ''
       packages: >-
         libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
         libgtk-3-dev

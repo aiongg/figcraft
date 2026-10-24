@@ -128,3 +128,8 @@ codegen-units = 1
 debug = false
 strip = true
 panic = "abort"
+
+# craft-libs' vendored krilla 0.8.2: decoded PNGs are capped at 1 GiB and reserved fallibly, and a
+# panic while drawing unwinds without aborting.
+[patch.crates-io]
+krilla = { git = "https://github.com/storytold/craft-libs", rev = "d6b3fb96718ff16c2e1bd2a5eb0526ec6e2cffd7" }

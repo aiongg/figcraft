@@ -133,7 +133,11 @@ pub fn section(app: &mut FigApp, ui: &mut Ui, doc: &Arc<Document>, ids: &[NodeId
                                     .variables
                                     .variables
                                     .iter()
-                                    .filter(|v| v.kind == VariableType::Color && bind_refusal(doc, &group.targets, &v.id).is_none() && in_scope(doc, &group.targets, &v.id))
+                                    .filter(|v| {
+                                        v.kind == VariableType::Color
+                                            && bind_refusal(doc, &group.targets, &v.id).is_none()
+                                            && in_scope(doc, &group.targets, &v.id)
+                                    })
                                     .collect();
                                 if !variables.is_empty() {
                                     ui.separator();

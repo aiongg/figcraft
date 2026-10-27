@@ -942,17 +942,17 @@ dependencies = [
 [[package]]
 name = "craft-docpath"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=4d7b82f7485f9c609d3ff27fca9afe976d548306#4d7b82f7485f9c609d3ff27fca9afe976d548306"
 
 [[package]]
 name = "craft-fonts-build"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=4d7b82f7485f9c609d3ff27fca9afe976d548306#4d7b82f7485f9c609d3ff27fca9afe976d548306"
 
 [[package]]
 name = "craft-i18n"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=4d7b82f7485f9c609d3ff27fca9afe976d548306#4d7b82f7485f9c609d3ff27fca9afe976d548306"
 dependencies = [
  "fixed_decimal",
  "icu_decimal",
@@ -975,7 +975,7 @@ dependencies = [
 [[package]]
 name = "craft-ui"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=4d7b82f7485f9c609d3ff27fca9afe976d548306#4d7b82f7485f9c609d3ff27fca9afe976d548306"
 dependencies = [
  "craft-fonts-build",
  "craft-i18n",
@@ -995,7 +995,7 @@ dependencies = [
 [[package]]
 name = "craft-update"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=4d7b82f7485f9c609d3ff27fca9afe976d548306#4d7b82f7485f9c609d3ff27fca9afe976d548306"
 dependencies = [
  "chrono",
  "dunce",
@@ -1020,7 +1020,7 @@ dependencies = [
 [[package]]
 name = "craft-window"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=4d7b82f7485f9c609d3ff27fca9afe976d548306#4d7b82f7485f9c609d3ff27fca9afe976d548306"
 dependencies = [
  "wayland-client",
 ]
@@ -2885,7 +2885,7 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 [[package]]
 name = "krilla"
 version = "0.8.2"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=4d7b82f7485f9c609d3ff27fca9afe976d548306#4d7b82f7485f9c609d3ff27fca9afe976d548306"
 dependencies = [
  "base64 0.22.1",
  "bumpalo",

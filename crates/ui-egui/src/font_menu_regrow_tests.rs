@@ -103,6 +103,7 @@ fn the_font_menu_regrows_after_a_search_matches_nothing() {
     let open = p.menu_rect(&before);
     let top = search_top(&nodes, open);
     assert!(open.height() > 100.0, "the menu lists fonts: {open:?}");
+    assert!(open.width() >= 240.0, "the menu keeps the 240 minimum width under a narrower field: {open:?}");
 
     let type_text = |p: &mut Panel, s: &str| p.settle(vec![Event::Text(s.into())]);
     let nodes = type_text(&mut p, "zzzzqqqq");
